@@ -27,8 +27,12 @@ export default function LoginPage() {
       // Wait a moment to show success state if needed, or just redirect
       router.push("/dashboard");
     } catch (err: any) {
-      setError(err.message || "Login failed. Please try again.");
-      setIsLoading(false);
+      if (err.type === "user_session_already_exists") {
+        router.push("/dashboard");
+      } else {
+        setError(err.message || "Login failed. Please try again.");
+        setIsLoading(false);
+      }
     }
   };
 
@@ -40,7 +44,7 @@ export default function LoginPage() {
           animate={{
             scale: [1, 1.2, 1],
             rotate: [0, 90, 0],
-            opacity: [0.1, 0.2, 0.1]
+            opacity: [0.1, 0.2, 0.1],
           }}
           transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
           className="absolute -top-1/2 -left-1/2 w-full h-full bg-gradient-to-br from-[#A8BBA3]/20 to-transparent rounded-full blur-3xl"
@@ -49,7 +53,7 @@ export default function LoginPage() {
           animate={{
             scale: [1, 1.3, 1],
             rotate: [0, -60, 0],
-            opacity: [0.1, 0.15, 0.1]
+            opacity: [0.1, 0.15, 0.1],
           }}
           transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
           className="absolute -bottom-1/2 -right-1/2 w-full h-full bg-gradient-to-tl from-[#A8BBA3]/20 to-transparent rounded-full blur-3xl"
@@ -138,10 +142,7 @@ export default function LoginPage() {
             </motion.div>
           )}
 
-          <motion.div
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.98 }}
-          >
+          <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}>
             <button
               type="submit"
               disabled={isLoading}
@@ -163,7 +164,9 @@ export default function LoginPage() {
             <div className="w-full border-t border-neutral-200 dark:border-neutral-800"></div>
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="px-2 bg-white dark:bg-neutral-900 text-neutral-500">Or</span>
+            <span className="px-2 bg-white dark:bg-neutral-900 text-neutral-500">
+              Or
+            </span>
           </div>
         </div>
 

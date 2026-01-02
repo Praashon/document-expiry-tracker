@@ -25,11 +25,14 @@ export default function RegisterPage() {
     setIsLoading(true);
     try {
       await registerUser(email, password, name);
-      alert("Registration successful! You can now log in.");
-      router.push("/login");
+      router.push("/dashboard");
     } catch (err: any) {
-      setError(err.message || "Registration failed. Please try again.");
-      setIsLoading(false);
+      if (err.type === "user_session_already_exists") {
+        router.push("/dashboard");
+      } else {
+        setError(err.message || "Registration failed. Please try again.");
+        setIsLoading(false);
+      }
     }
   };
 
@@ -41,7 +44,7 @@ export default function RegisterPage() {
           animate={{
             scale: [1, 1.2, 1],
             rotate: [0, -45, 0],
-            opacity: [0.1, 0.2, 0.1]
+            opacity: [0.1, 0.2, 0.1],
           }}
           transition={{ duration: 22, repeat: Infinity, ease: "linear" }}
           className="absolute -top-1/2 -right-1/2 w-full h-full bg-gradient-to-bl from-[#A8BBA3]/20 to-transparent rounded-full blur-3xl"
@@ -50,7 +53,7 @@ export default function RegisterPage() {
           animate={{
             scale: [1, 1.3, 1],
             rotate: [0, 30, 0],
-            opacity: [0.1, 0.15, 0.1]
+            opacity: [0.1, 0.15, 0.1],
           }}
           transition={{ duration: 28, repeat: Infinity, ease: "linear" }}
           className="absolute -bottom-1/2 -left-1/2 w-full h-full bg-gradient-to-tr from-[#A8BBA3]/20 to-transparent rounded-full blur-3xl"
@@ -162,10 +165,7 @@ export default function RegisterPage() {
             </motion.div>
           )}
 
-          <motion.div
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.98 }}
-          >
+          <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}>
             <button
               type="submit"
               disabled={isLoading}
