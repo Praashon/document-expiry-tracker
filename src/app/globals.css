@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-50 antialiased;
+  }
+
+  /* Custom Selection */
+  ::selection {
+    @apply bg-[#A8BBA3]/30 text-[#A8BBA3] dark:text-[#A8BBA3];
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-neutral-200 dark:bg-neutral-800 rounded-full border-4 border-solid border-transparent bg-clip-content hover:bg-neutral-300 dark:hover:bg-neutral-700;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
