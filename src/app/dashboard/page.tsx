@@ -2,9 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { checkAuth, logoutUser } from "@/lib/auth-actions";
-import { Loader2, LogOut } from "lucide-react";
+import { checkAuth } from "@/lib/auth-actions";
 import { Models } from "appwrite";
+import { Sidebar } from "@/components/layout/sidebar";
+import { Header } from "@/components/layout/header";
+import { StatsGrid } from "@/components/dashboard/stats-grid";
+import { RecentDocs } from "@/components/dashboard/recent-docs";
+import { Loader2 } from "lucide-react";
+import { motion } from "framer-motion";
 
 export default function DashboardPage() {
   const [user, setUser] = useState<Models.User<Models.Preferences> | null>(
@@ -35,42 +40,45 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950 text-neutral-900 dark:text-white">
-      <header className="bg-white dark:bg-neutral-900 shadow-sm">
-        <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">
-            Dashboard
-          </h1>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-neutral-600 dark:text-neutral-400 hidden sm:block">
-              Welcome, {user?.name}
-            </span>
-            <button
-              onClick={logoutUser}
-              className="flex items-center gap-2 py-2 px-4 rounded-lg text-sm font-semibold text-white bg-[#A8BBA3] hover:bg-[#92a88d] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#A8BBA3] transition-all"
-            >
-              <LogOut className="w-4 h-4" />
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
-      <main>
-        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-          {/* Dashboard content goes here */}
-          <div className="px-4 py-6 sm:px-0">
-            <div className="border-4 border-dashed border-neutral-200 dark:border-neutral-800 rounded-lg h-96 p-4 text-center">
-              <h2 className="text-xl font-semibold mb-2">
-                Document Expiration Tracker
-              </h2>
-              <p className="text-neutral-600 dark:text-neutral-400">
-                This is where you will see your list of documents. We will build
-                this part next.
+    <div className="flex min-h-screen bg-neutral-50 dark:bg-neutral-950">
+      <Sidebar />
+      <div className="flex-1 flex flex-col md:ml-64 transition-[margin] duration-300 ease-in-out">
+        <Header user={user} />
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="mx-auto max-w-7xl space-y-8"
+          >
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-white">
+                Dashboard
+              </h1>
+              <p className="text-neutral-500 dark:text-neutral-400 mt-2">
+                Welcome back, here's an overview of your documents.
               </p>
             </div>
-          </div>
-        </div>
-      </main>
+
+            <StatsGrid />
+
+            <div className="grid grid-cols-1 lg:grid-cols-6 gap-6">
+              <RecentDocs />
+              {/* Placeholder for another widget or chart if needed later */}
+              <div className="col-span-1 lg:col-span-2 rounded-xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/50 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="mx-auto w-12 h-12 rounded-full bg-[#A8BBA3]/10 flex items-center justify-center mb-4">
+                    <Loader2 className="w-6 h-6 text-[#A8BBA3]" />
+                  </div>
+                  <h3 className="font-semibold text-neutral-900 dark:text-white">Quick Actions</h3>
+                  <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Coming Soon</p>
+                </div>
+              </div>
+            </div>
+
+          </motion.div>
+        </main>
+      </div>
     </div>
   );
 }
