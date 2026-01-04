@@ -16,6 +16,8 @@ export default function DashboardPage() {
     null,
   );
   const [isLoading, setIsLoading] = useState(true);
+  const [file, setFile] = useState<File | null>(null);
+  const [refresh, setRefresh] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -30,6 +32,42 @@ export default function DashboardPage() {
     };
     check();
   }, [router]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setFile(e.target.files[0]);
+    }
+  };
+
+  const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!file) {
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const response = await fetch("/api/documents", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (response.ok) {
+        // Handle successful upload
+        console.log("File uploaded successfully");
+        setFile(null);
+        setRefresh(!refresh);
+        // You might want to refresh the recent documents list here
+      } else {
+        // Handle error
+        console.error("Error uploading file");
+      }
+    } catch (error) {
+      console.error("Error uploading file:", error);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -56,26 +94,34 @@ export default function DashboardPage() {
                 Dashboard
               </h1>
               <p className="text-neutral-500 dark:text-neutral-400 mt-2">
-                Welcome back, here's an overview of your documents.
+                Welcome back, heres an overview of your documents.
               </p>
             </div>
 
-            <StatsGrid />
+            <StatsGrid refresh={refresh} />
 
             <div className="grid grid-cols-1 lg:grid-cols-6 gap-6">
-              <RecentDocs />
-              {/* Placeholder for another widget or chart if needed later */}
-              <div className="col-span-1 lg:col-span-2 rounded-xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/50 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="mx-auto w-12 h-12 rounded-full bg-[#A8BBA3]/10 flex items-center justify-center mb-4">
-                    <Loader2 className="w-6 h-6 text-[#A8BBA3]" />
-                  </div>
-                  <h3 className="font-semibold text-neutral-900 dark:text-white">Quick Actions</h3>
-                  <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Coming Soon</p>
-                </div>
+              <RecentDocs refresh={refresh} />
+              <div className="col-span-1 lg:col-span-2 rounded-xl border border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/50">
+                <h3 className="font-semibold text-neutral-900 dark:text-white">
+                  Quick Actions
+                </h3>
+                <form onSubmit={handleUpload} className="mt-4">
+                  <input
+                    type="file"
+                    onChange={handleFileChange}
+                    className="w-full text-sm text-neutral-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[#A8BBA3]/10 file:text-[#A8BBA3] hover:file:bg-[#A8BBA3]/20"
+                  />
+                  <button
+                    type="submit"
+                    className="mt-4 w-full bg-[#A8BBA3] text-white rounded-md px-4 py-2 text-sm font-semibold shadow-sm hover:bg-[#97a992] disabled:opacity-50"
+                    disabled={!file}
+                  >
+                    Upload
+                  </button>
+                </form>
               </div>
             </div>
-
           </motion.div>
         </main>
       </div>
