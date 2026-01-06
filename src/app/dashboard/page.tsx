@@ -7,15 +7,17 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { StatsGrid } from "@/components/dashboard/stats-grid";
 import { RecentDocs } from "@/components/dashboard/recent-docs";
-import { Loader2 } from "lucide-react";
+import { AddDocumentModal } from "@/components/dashboard/add-document-modal";
+import { Loader2, Plus } from "lucide-react";
 import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
 import type { User } from "@supabase/supabase-js";
 
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [file, setFile] = useState<File | null>(null);
   const [refresh, setRefresh] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -31,40 +33,8 @@ export default function DashboardPage() {
     check();
   }, [router]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setFile(e.target.files[0]);
-    }
-  };
-
-  const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!file) {
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append("file", file);
-
-    try {
-      const response = await fetch("/api/documents", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (response.ok) {
-        // Handle successful upload
-        console.log("File uploaded successfully");
-        setFile(null);
-        setRefresh(!refresh);
-        // You might want to refresh the recent documents list here
-      } else {
-        // Handle error
-        console.error("Error uploading file");
-      }
-    } catch (error) {
-      console.error("Error uploading file:", error);
-    }
+  const handleDocumentAdded = () => {
+    setRefresh(!refresh);
   };
 
   if (isLoading) {
@@ -87,13 +57,22 @@ export default function DashboardPage() {
             transition={{ duration: 0.5 }}
             className="mx-auto max-w-7xl space-y-8"
           >
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-white">
-                Dashboard
-              </h1>
-              <p className="text-neutral-500 dark:text-neutral-400 mt-2">
-                Welcome back, heres an overview of your documents.
-              </p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-white">
+                  Dashboard
+                </h1>
+                <p className="text-neutral-500 dark:text-neutral-400 mt-2">
+                  Welcome back, here&apos;s an overview of your documents.
+                </p>
+              </div>
+              <Button
+                onClick={() => setIsAddModalOpen(true)}
+                className="flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Add Document
+              </Button>
             </div>
 
             <StatsGrid refresh={refresh} />
@@ -104,25 +83,36 @@ export default function DashboardPage() {
                 <h3 className="font-semibold text-neutral-900 dark:text-white">
                   Quick Actions
                 </h3>
-                <form onSubmit={handleUpload} className="mt-4">
-                  <input
-                    type="file"
-                    onChange={handleFileChange}
-                    className="w-full text-sm text-neutral-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-[#A8BBA3]/10 file:text-[#A8BBA3] hover:file:bg-[#A8BBA3]/20"
-                  />
+                <div className="mt-4 space-y-3">
                   <button
-                    type="submit"
-                    className="mt-4 w-full bg-[#A8BBA3] text-white rounded-md px-4 py-2 text-sm font-semibold shadow-sm hover:bg-[#97a992] disabled:opacity-50"
-                    disabled={!file}
+                    onClick={() => setIsAddModalOpen(true)}
+                    className="w-full flex items-center gap-3 p-3 rounded-lg border border-neutral-200 dark:border-neutral-700 hover:border-[#A8BBA3] hover:bg-[#A8BBA3]/5 transition-colors text-left"
                   >
-                    Upload
+                    <div className="p-2 bg-[#A8BBA3]/10 rounded-lg">
+                      <Plus className="w-4 h-4 text-[#A8BBA3]" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-neutral-900 dark:text-white">
+                        Add New Document
+                      </p>
+                      <p className="text-xs text-neutral-500">
+                        Track a new document expiration
+                      </p>
+                    </div>
                   </button>
-                </form>
+                </div>
               </div>
             </div>
           </motion.div>
         </main>
       </div>
+
+      {/* Add Document Modal */}
+      <AddDocumentModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onSuccess={handleDocumentAdded}
+      />
     </div>
   );
 }
