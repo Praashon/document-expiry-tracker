@@ -3,18 +3,16 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { checkAuth } from "@/lib/auth-actions";
-import { Models } from "appwrite";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { StatsGrid } from "@/components/dashboard/stats-grid";
 import { RecentDocs } from "@/components/dashboard/recent-docs";
 import { Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
+import type { User } from "@supabase/supabase-js";
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<Models.User<Models.Preferences> | null>(
-    null,
-  );
+  const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [file, setFile] = useState<File | null>(null);
   const [refresh, setRefresh] = useState(false);

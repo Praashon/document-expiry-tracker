@@ -1,10 +1,13 @@
 "use client";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { registerUser } from "@/lib/auth-actions";
 import Link from "next/link";
+import { registerUser } from "@/lib/auth-actions";
 import { motion } from "framer-motion";
 import { User, Mail, Lock, Loader2, ArrowRight } from "lucide-react";
+
+interface AuthError {
+  message?: string;
+}
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("");
@@ -12,7 +15,6 @@ export default function RegisterPage() {
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,17 +24,20 @@ export default function RegisterPage() {
       return;
     }
 
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+
     setIsLoading(true);
     try {
       await registerUser(email, password, name);
-      router.push("/dashboard");
-    } catch (err: any) {
-      if (err.type === "user_session_already_exists") {
-        router.push("/dashboard");
-      } else {
-        setError(err.message || "Registration failed. Please try again.");
-        setIsLoading(false);
-      }
+      window.location.href = "/dashboard";
+    } catch (err: unknown) {
+      const authErr = err as AuthError;
+      console.error("[Register] Error:", authErr);
+      setError(authErr.message || "Registration failed. Please try again.");
+      setIsLoading(false);
     }
   };
 
@@ -99,6 +104,7 @@ export default function RegisterPage() {
                 <input
                   id="name"
                   type="text"
+                  autoComplete="name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="block w-full pl-10 pr-3 py-2.5 bg-neutral-50 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl focus:ring-2 focus:ring-[#A8BBA3]/20 focus:border-[#A8BBA3] transition-all duration-200 outline-none text-neutral-900 dark:text-white placeholder-neutral-400"
@@ -122,6 +128,7 @@ export default function RegisterPage() {
                 <input
                   id="email"
                   type="email"
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="block w-full pl-10 pr-3 py-2.5 bg-neutral-50 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl focus:ring-2 focus:ring-[#A8BBA3]/20 focus:border-[#A8BBA3] transition-all duration-200 outline-none text-neutral-900 dark:text-white placeholder-neutral-400"
@@ -145,6 +152,7 @@ export default function RegisterPage() {
                 <input
                   id="password"
                   type="password"
+                  autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="block w-full pl-10 pr-3 py-2.5 bg-neutral-50 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl focus:ring-2 focus:ring-[#A8BBA3]/20 focus:border-[#A8BBA3] transition-all duration-200 outline-none text-neutral-900 dark:text-white placeholder-neutral-400"
@@ -152,6 +160,9 @@ export default function RegisterPage() {
                   required
                 />
               </div>
+              <p className="text-xs text-neutral-500 dark:text-neutral-400 ml-1">
+                Must be at least 6 characters
+              </p>
             </div>
           </div>
 

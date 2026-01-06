@@ -4,40 +4,55 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileText, AlertCircle, CheckCircle, Clock } from "lucide-react";
-import { getDocuments } from "@/lib/document-actions";
+import { getDocumentStats } from "@/lib/document-actions";
 import { checkAuth } from "@/lib/auth-actions";
-import { Models } from "appwrite";
+
+interface DocumentStats {
+  total: number;
+  valid: number;
+  expiringSoon: number;
+  expired: number;
+}
 
 export function StatsGrid({ refresh }: { refresh: boolean }) {
-  const [totalDocuments, setTotalDocuments] = useState(0);
-  const [user, setUser] = useState<Models.User<Models.Preferences> | null>(
-    null,
-  );
+  const [stats, setStats] = useState<DocumentStats>({
+    total: 0,
+    valid: 0,
+    expiringSoon: 0,
+    expired: 0,
+  });
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchUserAndDocuments = async () => {
-      const currentUser = await checkAuth();
-      if (currentUser) {
-        setUser(currentUser);
-        const userDocuments = await getDocuments(currentUser.$id);
-        setTotalDocuments(userDocuments.length);
+    const fetchStats = async () => {
+      setIsLoading(true);
+      try {
+        const currentUser = await checkAuth();
+        if (currentUser) {
+          const documentStats = await getDocumentStats(currentUser.id);
+          setStats(documentStats);
+        }
+      } catch (error) {
+        console.error("Error fetching document stats:", error);
+      } finally {
+        setIsLoading(false);
       }
     };
-    fetchUserAndDocuments();
+    fetchStats();
   }, [refresh]);
 
-  const stats = [
+  const statCards = [
     {
       title: "Total Documents",
-      value: totalDocuments.toString(),
-      description: "All uploaded documents",
+      value: stats.total.toString(),
+      description: "All tracked documents",
       icon: FileText,
       color: "text-blue-500",
       bgColor: "bg-blue-50 dark:bg-blue-900/10",
     },
     {
       title: "Expiring Soon",
-      value: "0",
+      value: stats.expiringSoon.toString(),
       description: "Within 30 days",
       icon: Clock,
       color: "text-orange-500",
@@ -45,7 +60,7 @@ export function StatsGrid({ refresh }: { refresh: boolean }) {
     },
     {
       title: "Expired",
-      value: "0",
+      value: stats.expired.toString(),
       description: "Action required",
       icon: AlertCircle,
       color: "text-red-500",
@@ -53,7 +68,7 @@ export function StatsGrid({ refresh }: { refresh: boolean }) {
     },
     {
       title: "Valid",
-      value: "0",
+      value: stats.valid.toString(),
       description: "Active documents",
       icon: CheckCircle,
       color: "text-[#A8BBA3]",
@@ -83,7 +98,7 @@ export function StatsGrid({ refresh }: { refresh: boolean }) {
       animate="show"
       className="grid gap-4 md:grid-cols-2 lg:grid-cols-4"
     >
-      {stats.map((stat, index) => (
+      {statCards.map((stat) => (
         <motion.div key={stat.title} variants={item}>
           <Card className="overflow-hidden border-none shadow-sm hover:shadow-md transition-shadow dark:bg-neutral-900/50">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -95,7 +110,13 @@ export function StatsGrid({ refresh }: { refresh: boolean }) {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
+              <div className="text-2xl font-bold">
+                {isLoading ? (
+                  <span className="animate-pulse">—</span>
+                ) : (
+                  stat.value
+                )}
+              </div>
               <p className="text-xs text-neutral-500 dark:text-neutral-400">
                 {stat.description}
               </p>

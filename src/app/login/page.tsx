@@ -1,38 +1,40 @@
 "use client";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { loginUser } from "@/lib/auth-actions";
 import { motion } from "framer-motion";
 import { Mail, Lock, Loader2, ArrowRight } from "lucide-react";
+
+interface AuthError {
+  message?: string;
+}
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
     if (!email || !password) {
       setError("Please fill in all fields.");
       return;
     }
 
     setIsLoading(true);
+
     try {
       await loginUser(email, password);
-      // Wait a moment to show success state if needed, or just redirect
-      router.push("/dashboard");
-    } catch (err: any) {
-      if (err.type === "user_session_already_exists") {
-        router.push("/dashboard");
-      } else {
-        setError(err.message || "Login failed. Please try again.");
-        setIsLoading(false);
-      }
+      // Use window.location for a full page reload to ensure session is recognized
+      window.location.href = "/dashboard";
+    } catch (err: unknown) {
+      const authErr = err as AuthError;
+      console.error("[Login] Error:", authErr);
+      setError(authErr.message || "Login failed. Please try again.");
+      setIsLoading(false);
     }
   };
 
@@ -99,6 +101,7 @@ export default function LoginPage() {
                 <input
                   id="email"
                   type="email"
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="block w-full pl-10 pr-3 py-2.5 bg-neutral-50 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl focus:ring-2 focus:ring-[#A8BBA3]/20 focus:border-[#A8BBA3] transition-all duration-200 outline-none text-neutral-900 dark:text-white placeholder-neutral-400"
@@ -122,6 +125,7 @@ export default function LoginPage() {
                 <input
                   id="password"
                   type="password"
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="block w-full pl-10 pr-3 py-2.5 bg-neutral-50 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl focus:ring-2 focus:ring-[#A8BBA3]/20 focus:border-[#A8BBA3] transition-all duration-200 outline-none text-neutral-900 dark:text-white placeholder-neutral-400"
@@ -171,7 +175,7 @@ export default function LoginPage() {
         </div>
 
         <div className="text-sm text-center text-neutral-600 dark:text-neutral-400">
-          Don't have an account?{" "}
+          Don&apos;t have an account?{" "}
           <Link
             href="/register"
             className="font-semibold text-[#A8BBA3] hover:text-[#92a88d] hover:underline transition-all"

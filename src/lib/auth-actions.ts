@@ -1,41 +1,81 @@
-import { account, ID } from "./appwrite";
+import { supabase } from "./supabase";
 
 export const registerUser = async (
   email: string,
   password: string,
   name: string,
 ) => {
-  try {
-    // Create account
-    await account.create(ID.unique(), email, password, name);
-    return await account.createEmailPasswordSession(email, password);
-  } catch (error: any) {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        name,
+      },
+    },
+  });
+
+  if (error) {
     throw error;
   }
+
+  return data;
 };
 
 export const loginUser = async (email: string, password: string) => {
-  try {
-    return await account.createEmailPasswordSession(email, password);
-  } catch (error: any) {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error) {
     throw error;
   }
+
+  return data;
 };
 
 export const checkAuth = async () => {
-  try {
-    return await account.get();
-  } catch (error) {
-    return null;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user;
+};
+
+export const deleteCurrentSession = async () => {
+  const { error } = await supabase.auth.signOut();
+  if (error) {
+    console.error("Sign out failed:", error.message);
+    return false;
   }
+  return true;
 };
 
 export const logoutUser = async () => {
-  try {
-    await account.deleteSession("current");
-
-    window.location.href = "/login";
-  } catch (error: any) {
-    console.error("Logout failed:", error.message || error);
+  const { error } = await supabase.auth.signOut();
+  if (error) {
+    console.error("Logout failed:", error.message);
+    return;
   }
+  window.location.href = "/login";
+};
+
+export const getCurrentUser = async () => {
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error) {
+    console.error("Error getting user:", error.message);
+    return null;
+  }
+
+  return user;
+};
+
+export const onAuthStateChange = (
+  callback: (event: string, session: unknown) => void,
+) => {
+  return supabase.auth.onAuthStateChange(callback);
 };

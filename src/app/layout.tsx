@@ -1,7 +1,3 @@
-import {
-  getOrCreateBucket,
-  getOrCreateCollection,
-} from "@/lib/document-actions";
 import type { Metadata } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
@@ -18,8 +14,6 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  getOrCreateBucket();
-  getOrCreateCollection();
   return (
     <html
       lang="en"
