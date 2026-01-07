@@ -1,6 +1,6 @@
-import { supabase, Document, DocumentStatus, DocumentType } from "./supabase";
+import { supabaseBrowser } from "./supabase-browser";
+import { Document, DocumentStatus, DocumentType } from "./supabase";
 
-// Interface for documents returned from database
 interface DbDocument {
   id: string;
   title: string;
@@ -17,7 +17,6 @@ interface DbDocument {
   updated_at: string;
 }
 
-// Helper function to determine document status
 export function getDocumentStatus(expirationDate: string): DocumentStatus {
   const now = new Date();
   const expDate = new Date(expirationDate);
@@ -33,7 +32,6 @@ export function getDocumentStatus(expirationDate: string): DocumentStatus {
   }
 }
 
-// Helper function to calculate days until expiration
 export function getDaysUntilExpiration(expirationDate: string): number {
   const now = new Date();
   const expDate = new Date(expirationDate);
@@ -42,12 +40,11 @@ export function getDaysUntilExpiration(expirationDate: string): number {
   return diffDays;
 }
 
-// Upload a file to Supabase Storage
 export async function uploadFile(file: File, userId: string) {
   const fileExt = file.name.split(".").pop();
   const fileName = `${userId}/${Date.now()}.${fileExt}`;
 
-  const { data, error } = await supabase.storage
+  const { data, error } = await supabaseBrowser.storage
     .from("documents")
     .upload(fileName, file);
 
@@ -59,17 +56,17 @@ export async function uploadFile(file: File, userId: string) {
   return data;
 }
 
-// Get file public URL
 export function getFileUrl(filePath: string): string {
-  const { data } = supabase.storage.from("documents").getPublicUrl(filePath);
+  const { data } = supabaseBrowser.storage
+    .from("documents")
+    .getPublicUrl(filePath);
   return data.publicUrl;
 }
 
-// Get file download URL
 export async function getFileDownloadUrl(filePath: string): Promise<string> {
-  const { data, error } = await supabase.storage
+  const { data, error } = await supabaseBrowser.storage
     .from("documents")
-    .createSignedUrl(filePath, 3600); // 1 hour expiry
+    .createSignedUrl(filePath, 3600);
 
   if (error) {
     console.error("Error getting download URL:", error);
@@ -79,9 +76,10 @@ export async function getFileDownloadUrl(filePath: string): Promise<string> {
   return data.signedUrl;
 }
 
-// Delete a file from storage
 export async function deleteFile(filePath: string) {
-  const { error } = await supabase.storage.from("documents").remove([filePath]);
+  const { error } = await supabaseBrowser.storage
+    .from("documents")
+    .remove([filePath]);
 
   if (error) {
     console.error("Error deleting file:", error);
@@ -89,11 +87,10 @@ export async function deleteFile(filePath: string) {
   }
 }
 
-// Create a new document entry
 export async function createDocument(
   data: Omit<Document, "id" | "created_at" | "updated_at">,
 ) {
-  const { data: document, error } = await supabase
+  const { data: document, error } = await supabaseBrowser
     .from("documents")
     .insert({
       title: data.title,
@@ -118,9 +115,8 @@ export async function createDocument(
   return document;
 }
 
-// Get all documents for a user
 export async function getDocuments(userId: string) {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseBrowser
     .from("documents")
     .select("*")
     .eq("user_id", userId)
@@ -134,9 +130,8 @@ export async function getDocuments(userId: string) {
   return data || [];
 }
 
-// Get a single document by ID
 export async function getDocument(documentId: string) {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseBrowser
     .from("documents")
     .select("*")
     .eq("id", documentId)
@@ -150,12 +145,11 @@ export async function getDocument(documentId: string) {
   return data;
 }
 
-// Update a document
 export async function updateDocument(
   documentId: string,
   data: Partial<Omit<Document, "id" | "user_id" | "created_at" | "updated_at">>,
 ) {
-  const { data: document, error } = await supabase
+  const { data: document, error } = await supabaseBrowser
     .from("documents")
     .update({
       ...data,
@@ -173,20 +167,16 @@ export async function updateDocument(
   return document;
 }
 
-// Delete a document and its associated file
 export async function deleteDocument(documentId: string, filePath?: string) {
-  // Delete the file from storage if it exists
   if (filePath) {
     try {
       await deleteFile(filePath);
     } catch (fileError) {
       console.warn("Could not delete file:", fileError);
-      // Continue with document deletion even if file deletion fails
     }
   }
 
-  // Delete the document from the database
-  const { error } = await supabase
+  const { error } = await supabaseBrowser
     .from("documents")
     .delete()
     .eq("id", documentId);
@@ -197,7 +187,6 @@ export async function deleteDocument(documentId: string, filePath?: string) {
   }
 }
 
-// Get documents by status
 export async function getDocumentsByStatus(
   userId: string,
   status: DocumentStatus,
@@ -209,7 +198,6 @@ export async function getDocumentsByStatus(
   });
 }
 
-// Get document statistics for a user
 export async function getDocumentStats(userId: string) {
   const documents = await getDocuments(userId);
 
@@ -235,7 +223,6 @@ export async function getDocumentStats(userId: string) {
   };
 }
 
-// Get documents expiring within a specific number of days
 export async function getDocumentsExpiringWithin(userId: string, days: number) {
   const documents = await getDocuments(userId);
   const now = new Date();
@@ -249,9 +236,8 @@ export async function getDocumentsExpiringWithin(userId: string, days: number) {
   });
 }
 
-// Search documents by title
 export async function searchDocuments(userId: string, searchTerm: string) {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseBrowser
     .from("documents")
     .select("*")
     .eq("user_id", userId)
@@ -266,9 +252,8 @@ export async function searchDocuments(userId: string, searchTerm: string) {
   return data || [];
 }
 
-// Get documents by type
 export async function getDocumentsByType(userId: string, type: DocumentType) {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseBrowser
     .from("documents")
     .select("*")
     .eq("user_id", userId)
@@ -283,5 +268,4 @@ export async function getDocumentsByType(userId: string, type: DocumentType) {
   return data || [];
 }
 
-// Re-export types for convenience
 export type { Document, DocumentType, DocumentStatus, DbDocument };

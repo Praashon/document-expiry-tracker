@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createDocument, uploadFile } from "@/lib/document-actions";
-import { supabase } from "@/lib/supabase";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { DocumentType } from "@/lib/supabase";
 
 export async function POST(req: NextRequest) {
   try {
-    // Get the current user
+    const supabase = await createSupabaseServerClient();
+
     const {
       data: { user },
       error: authError,
@@ -18,14 +18,13 @@ export async function POST(req: NextRequest) {
     const userId = user.id;
     const formData = await req.formData();
 
-    // Extract form fields
     const title = formData.get("title") as string;
     const type = formData.get("type") as DocumentType;
     const expirationDate = formData.get("expiration_date") as string;
     const reminderDate = formData.get("reminder_date") as string | null;
     const notes = formData.get("notes") as string | null;
     const file = formData.get("file") as File | null;
-    // Validate required fields
+
     if (!title || !type || !expirationDate) {
       return NextResponse.json(
         {
@@ -41,28 +40,52 @@ export async function POST(req: NextRequest) {
     let fileType: string | null = null;
     let fileSize: number | null = null;
 
-    // Upload file if provided
     if (file && file.size > 0) {
-      const uploadedFile = await uploadFile(file, userId);
-      filePath = uploadedFile.path;
+      const fileExt = file.name.split(".").pop();
+      const uploadFileName = `${userId}/${Date.now()}.${fileExt}`;
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("documents")
+        .upload(uploadFileName, file);
+
+      if (uploadError) {
+        console.error("Error uploading file:", uploadError);
+        return NextResponse.json(
+          { error: "Error uploading file" },
+          { status: 500 },
+        );
+      }
+
+      filePath = uploadData.path;
       fileName = file.name;
       fileType = file.type;
       fileSize = file.size;
     }
 
-    // Create document in database
-    const newDocument = await createDocument({
-      title,
-      type,
-      expiration_date: expirationDate,
-      reminder_date: reminderDate || null,
-      notes: notes || null,
-      file_path: filePath,
-      file_name: fileName,
-      file_type: fileType,
-      file_size: fileSize,
-      user_id: userId,
-    });
+    const { data: newDocument, error: insertError } = await supabase
+      .from("documents")
+      .insert({
+        title: title.trim(),
+        type,
+        expiration_date: expirationDate,
+        reminder_date: reminderDate || null,
+        notes: notes?.trim() || null,
+        file_path: filePath,
+        file_name: fileName,
+        file_type: fileType,
+        file_size: fileSize,
+        user_id: userId,
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error("Error creating document:", insertError);
+      return NextResponse.json(
+        { error: "Error creating document" },
+        { status: 500 },
+      );
+    }
 
     return NextResponse.json(newDocument, { status: 201 });
   } catch (error) {
@@ -76,7 +99,8 @@ export async function POST(req: NextRequest) {
 
 export async function GET(_req: NextRequest) {
   try {
-    // Get the current user
+    const supabase = await createSupabaseServerClient();
+
     const {
       data: { user },
       error: authError,

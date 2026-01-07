@@ -114,7 +114,6 @@ export default function DashboardPage() {
   const [refresh, setRefresh] = useState(false);
   const router = useRouter();
 
-  // Search and filter state
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<DocumentStatus | "all">(
     "all",
@@ -124,7 +123,6 @@ export default function DashboardPage() {
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [showFilters, setShowFilters] = useState(false);
 
-  // Modal state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -133,7 +131,6 @@ export default function DashboardPage() {
     null,
   );
 
-  // Dropdown menu state
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -170,11 +167,9 @@ export default function DashboardPage() {
     setRefresh(!refresh);
   };
 
-  // Filter and sort documents
   const filteredAndSortedDocuments = useMemo(() => {
     let result = [...documents];
 
-    // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       result = result.filter(
@@ -185,7 +180,6 @@ export default function DashboardPage() {
       );
     }
 
-    // Status filter
     if (statusFilter !== "all") {
       result = result.filter((doc) => {
         if (!doc.expiration_date) return false;
@@ -193,12 +187,10 @@ export default function DashboardPage() {
       });
     }
 
-    // Type filter
     if (typeFilter !== "all") {
       result = result.filter((doc) => doc.type === typeFilter);
     }
 
-    // Sort
     result.sort((a, b) => {
       let comparison = 0;
 
@@ -231,7 +223,6 @@ export default function DashboardPage() {
     return result;
   }, [documents, searchQuery, statusFilter, typeFilter, sortField, sortOrder]);
 
-  // Handlers
   const handleView = (doc: Document) => {
     setSelectedDocument(doc);
     setIsViewModalOpen(true);
@@ -319,12 +310,9 @@ export default function DashboardPage() {
               </Button>
             </div>
 
-            {/* Stats Grid */}
             <StatsGrid refresh={refresh} />
 
-            {/* Search and Filters Section */}
             <div className="space-y-4">
-              {/* Section Header */}
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">
                   All Documents
@@ -345,7 +333,6 @@ export default function DashboardPage() {
                 </p>
               </div>
 
-              {/* Search Bar */}
               <div className="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 p-2 shadow-sm">
                 <div className="flex items-center gap-3">
                   <div className="pl-3">
@@ -392,7 +379,6 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Filter Pills & Options */}
               <AnimatePresence>
                 {showFilters && (
                   <motion.div
@@ -402,7 +388,6 @@ export default function DashboardPage() {
                     transition={{ duration: 0.2 }}
                     className="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 p-4 space-y-4"
                   >
-                    {/* Status Filter Pills */}
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mr-2">
                         Status
@@ -446,7 +431,6 @@ export default function DashboardPage() {
                       ))}
                     </div>
 
-                    {/* Type Filter Pills */}
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mr-2">
                         Type
@@ -483,7 +467,6 @@ export default function DashboardPage() {
                       ))}
                     </div>
 
-                    {/* Sort Options */}
                     <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-neutral-200 dark:border-neutral-800">
                       <div className="flex items-center gap-2">
                         <ArrowUpDown className="w-4 h-4 text-neutral-400" />
@@ -544,7 +527,6 @@ export default function DashboardPage() {
               </AnimatePresence>
             </div>
 
-            {/* Documents Grid */}
             {filteredAndSortedDocuments.length === 0 ? (
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -593,7 +575,6 @@ export default function DashboardPage() {
                       transition={{ delay: index * 0.03 }}
                       className="bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 overflow-hidden hover:shadow-lg hover:border-[#A8BBA3]/50 transition-all group"
                     >
-                      {/* Card Header */}
                       <div className="p-4 border-b border-neutral-100 dark:border-neutral-800">
                         <div className="flex items-start justify-between">
                           <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -610,7 +591,6 @@ export default function DashboardPage() {
                             </div>
                           </div>
 
-                          {/* Actions Menu */}
                           <div className="relative">
                             <button
                               onClick={() =>
@@ -659,7 +639,6 @@ export default function DashboardPage() {
                         </div>
                       </div>
 
-                      {/* Card Body */}
                       <div
                         className="p-4 space-y-3 cursor-pointer"
                         onClick={() => handleView(doc)}
@@ -724,7 +703,6 @@ export default function DashboardPage() {
         />
       )}
 
-      {/* Modals */}
       <AddDocumentModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}

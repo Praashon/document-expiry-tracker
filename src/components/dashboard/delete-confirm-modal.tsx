@@ -29,7 +29,9 @@ export function DeleteConfirmModal({
       await onConfirm();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete document");
+      setError(
+        err instanceof Error ? err.message : "Failed to delete document",
+      );
     } finally {
       setIsDeleting(false);
     }
@@ -46,7 +48,6 @@ export function DeleteConfirmModal({
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -55,7 +56,6 @@ export function DeleteConfirmModal({
             className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
           />
 
-          {/* Modal */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -64,7 +64,6 @@ export function DeleteConfirmModal({
             className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-md"
           >
             <div className="bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl border border-neutral-200 dark:border-neutral-800 overflow-hidden">
-              {/* Header */}
               <div className="flex items-center justify-between p-6 border-b border-neutral-200 dark:border-neutral-800">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-red-50 dark:bg-red-900/20 rounded-lg">
@@ -83,7 +82,6 @@ export function DeleteConfirmModal({
                 </button>
               </div>
 
-              {/* Content */}
               <div className="p-6 space-y-4">
                 {error && (
                   <motion.div
@@ -111,7 +109,6 @@ export function DeleteConfirmModal({
                 </div>
               </div>
 
-              {/* Actions */}
               <div className="flex gap-3 p-6 pt-0">
                 <Button
                   type="button"

@@ -32,7 +32,6 @@ export function EditDocumentModal({
   const [error, setError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
 
-  // Form state
   const [title, setTitle] = useState("");
   const [type, setType] = useState<DocumentType>("Other");
   const [expirationDate, setExpirationDate] = useState("");
@@ -42,7 +41,6 @@ export function EditDocumentModal({
   const [existingFileName, setExistingFileName] = useState<string | null>(null);
   const [removeExistingFile, setRemoveExistingFile] = useState(false);
 
-  // Populate form when document changes
   useEffect(() => {
     if (document) {
       setTitle(document.title || "");
@@ -118,7 +116,6 @@ export function EditDocumentModal({
       return;
     }
 
-    // Validation
     if (!title.trim()) {
       setError("Please enter a document title");
       return;
@@ -134,7 +131,6 @@ export function EditDocumentModal({
       return;
     }
 
-    // Validate file size if new file
     if (file && file.size > 10 * 1024 * 1024) {
       setError("File size must be less than 10MB");
       return;
@@ -174,7 +170,6 @@ export function EditDocumentModal({
         throw new Error(data.error || "Failed to update document");
       }
 
-      // Success
       resetForm();
       onSuccess();
       onClose();
@@ -195,7 +190,6 @@ export function EditDocumentModal({
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -204,7 +198,6 @@ export function EditDocumentModal({
             className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
           />
 
-          {/* Modal */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -213,7 +206,6 @@ export function EditDocumentModal({
             className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-lg max-h-[90vh] overflow-y-auto"
           >
             <div className="bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl border border-neutral-200 dark:border-neutral-800">
-              {/* Header */}
               <div className="flex items-center justify-between p-6 border-b border-neutral-200 dark:border-neutral-800">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-[#A8BBA3]/10 rounded-lg">
@@ -231,9 +223,7 @@ export function EditDocumentModal({
                 </button>
               </div>
 
-              {/* Form */}
               <form onSubmit={handleSubmit} className="p-6 space-y-5">
-                {/* Error Message */}
                 {error && (
                   <motion.div
                     initial={{ opacity: 0, y: -10 }}
@@ -244,7 +234,6 @@ export function EditDocumentModal({
                   </motion.div>
                 )}
 
-                {/* Title */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
                     Document Title <span className="text-red-500">*</span>
@@ -262,7 +251,6 @@ export function EditDocumentModal({
                   </p>
                 </div>
 
-                {/* Type */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
                     Document Type <span className="text-red-500">*</span>
@@ -286,9 +274,7 @@ export function EditDocumentModal({
                   </div>
                 </div>
 
-                {/* Dates Row */}
                 <div className="grid grid-cols-2 gap-4">
-                  {/* Expiration Date */}
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
                       Expiration Date <span className="text-red-500">*</span>
@@ -305,7 +291,6 @@ export function EditDocumentModal({
                     </div>
                   </div>
 
-                  {/* Reminder Date */}
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
                       Reminder Date
@@ -323,7 +308,6 @@ export function EditDocumentModal({
                   </div>
                 </div>
 
-                {/* Notes */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
                     Notes
@@ -338,7 +322,6 @@ export function EditDocumentModal({
                   />
                 </div>
 
-                {/* File Upload */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
                     Attached File
@@ -425,7 +408,6 @@ export function EditDocumentModal({
                   </div>
                 </div>
 
-                {/* Actions */}
                 <div className="flex gap-3 pt-4">
                   <Button
                     type="button"

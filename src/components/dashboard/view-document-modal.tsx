@@ -29,7 +29,11 @@ interface ViewDocumentModalProps {
   document: Document | null;
 }
 
-function StatusBadge({ status }: { status: "valid" | "expiring_soon" | "expired" }) {
+function StatusBadge({
+  status,
+}: {
+  status: "valid" | "expiring_soon" | "expired";
+}) {
   const config = {
     valid: {
       icon: CheckCircle,
@@ -113,10 +117,14 @@ export function ViewDocumentModal({
   const getTypeColor = (type: string) => {
     const colors: Record<string, string> = {
       Rent: "bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400",
-      Insurance: "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400",
-      Subscription: "bg-pink-50 text-pink-700 dark:bg-pink-900/20 dark:text-pink-400",
-      License: "bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400",
-      Other: "bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-400",
+      Insurance:
+        "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400",
+      Subscription:
+        "bg-pink-50 text-pink-700 dark:bg-pink-900/20 dark:text-pink-400",
+      License:
+        "bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400",
+      Other:
+        "bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-400",
     };
     return colors[type] || colors.Other;
   };
@@ -125,7 +133,6 @@ export function ViewDocumentModal({
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -134,7 +141,6 @@ export function ViewDocumentModal({
             className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
           />
 
-          {/* Modal */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -143,7 +149,6 @@ export function ViewDocumentModal({
             className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-lg max-h-[90vh] overflow-y-auto"
           >
             <div className="bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl border border-neutral-200 dark:border-neutral-800">
-              {/* Header */}
               <div className="flex items-center justify-between p-6 border-b border-neutral-200 dark:border-neutral-800">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-[#A8BBA3]/10 rounded-lg">
@@ -161,9 +166,7 @@ export function ViewDocumentModal({
                 </button>
               </div>
 
-              {/* Content */}
               <div className="p-6 space-y-6">
-                {/* Title and Status */}
                 <div className="space-y-3">
                   <h3 className="text-2xl font-bold text-neutral-900 dark:text-white">
                     {document.title}
@@ -179,7 +182,6 @@ export function ViewDocumentModal({
                   </div>
                 </div>
 
-                {/* Expiration Info */}
                 <div className="p-4 rounded-xl bg-neutral-50 dark:bg-neutral-800/50 space-y-4">
                   <div className="flex items-start gap-3">
                     <div className="p-2 bg-white dark:bg-neutral-800 rounded-lg shadow-sm">
@@ -231,7 +233,6 @@ export function ViewDocumentModal({
                   )}
                 </div>
 
-                {/* Notes */}
                 {document.notes && (
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-neutral-500 dark:text-neutral-400">
@@ -244,7 +245,6 @@ export function ViewDocumentModal({
                   </div>
                 )}
 
-                {/* Attached File */}
                 {document.file_name && (
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-neutral-500 dark:text-neutral-400">
@@ -286,7 +286,6 @@ export function ViewDocumentModal({
                   </div>
                 )}
 
-                {/* Metadata */}
                 <div className="pt-4 border-t border-neutral-200 dark:border-neutral-800">
                   <div className="flex items-center justify-between text-xs text-neutral-400">
                     <span>
@@ -305,7 +304,6 @@ export function ViewDocumentModal({
                 </div>
               </div>
 
-              {/* Actions */}
               <div className="flex gap-3 p-6 pt-0">
                 <Button
                   type="button"
@@ -315,11 +313,7 @@ export function ViewDocumentModal({
                 >
                   Close
                 </Button>
-                <Button
-                  type="button"
-                  onClick={onEdit}
-                  className="flex-1 gap-2"
-                >
+                <Button type="button" onClick={onEdit} className="flex-1 gap-2">
                   <ExternalLink className="w-4 h-4" />
                   Edit Document
                 </Button>

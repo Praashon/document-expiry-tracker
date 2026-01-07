@@ -1,11 +1,11 @@
-import { supabase } from "./supabase";
+import { supabaseBrowser } from "./supabase-browser";
 
 export const registerUser = async (
   email: string,
   password: string,
   name: string,
 ) => {
-  const { data, error } = await supabase.auth.signUp({
+  const { data, error } = await supabaseBrowser.auth.signUp({
     email,
     password,
     options: {
@@ -23,7 +23,7 @@ export const registerUser = async (
 };
 
 export const loginUser = async (email: string, password: string) => {
-  const { data, error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabaseBrowser.auth.signInWithPassword({
     email,
     password,
   });
@@ -38,12 +38,12 @@ export const loginUser = async (email: string, password: string) => {
 export const checkAuth = async () => {
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await supabaseBrowser.auth.getUser();
   return user;
 };
 
 export const deleteCurrentSession = async () => {
-  const { error } = await supabase.auth.signOut();
+  const { error } = await supabaseBrowser.auth.signOut();
   if (error) {
     console.error("Sign out failed:", error.message);
     return false;
@@ -52,7 +52,7 @@ export const deleteCurrentSession = async () => {
 };
 
 export const logoutUser = async () => {
-  const { error } = await supabase.auth.signOut();
+  const { error } = await supabaseBrowser.auth.signOut();
   if (error) {
     console.error("Logout failed:", error.message);
     return;
@@ -64,7 +64,7 @@ export const getCurrentUser = async () => {
   const {
     data: { user },
     error,
-  } = await supabase.auth.getUser();
+  } = await supabaseBrowser.auth.getUser();
 
   if (error) {
     console.error("Error getting user:", error.message);
@@ -77,5 +77,5 @@ export const getCurrentUser = async () => {
 export const onAuthStateChange = (
   callback: (event: string, session: unknown) => void,
 ) => {
-  return supabase.auth.onAuthStateChange(callback);
+  return supabaseBrowser.auth.onAuthStateChange(callback);
 };

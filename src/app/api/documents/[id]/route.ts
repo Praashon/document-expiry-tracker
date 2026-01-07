@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
-import { uploadFile, deleteFile } from "@/lib/document-actions";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { DocumentType } from "@/lib/supabase";
 
-// GET - Fetch a single document by ID
 export async function GET(
   _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
+    const supabase = await createSupabaseServerClient();
 
-    // Get the current user
     const {
       data: { user },
       error: authError,
@@ -21,16 +19,18 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Fetch the document
     const { data: document, error } = await supabase
       .from("documents")
       .select("*")
       .eq("id", id)
-      .eq("user_id", user.id) // Ensure user owns this document
+      .eq("user_id", user.id)
       .single();
 
     if (error || !document) {
-      return NextResponse.json({ error: "Document not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Document not found" },
+        { status: 404 },
+      );
     }
 
     return NextResponse.json(document);
@@ -38,20 +38,19 @@ export async function GET(
     console.error("Error fetching document:", error);
     return NextResponse.json(
       { error: "Error fetching document" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
-// PUT - Update a document
 export async function PUT(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
+    const supabase = await createSupabaseServerClient();
 
-    // Get the current user
     const {
       data: { user },
       error: authError,
@@ -61,7 +60,6 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // First, verify the document exists and belongs to the user
     const { data: existingDoc, error: fetchError } = await supabase
       .from("documents")
       .select("*")
@@ -70,12 +68,14 @@ export async function PUT(
       .single();
 
     if (fetchError || !existingDoc) {
-      return NextResponse.json({ error: "Document not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Document not found" },
+        { status: 404 },
+      );
     }
 
     const formData = await req.formData();
 
-    // Extract form fields
     const title = formData.get("title") as string;
     const type = formData.get("type") as DocumentType;
     const expirationDate = formData.get("expiration_date") as string;
@@ -84,39 +84,42 @@ export async function PUT(
     const file = formData.get("file") as File | null;
     const removeFile = formData.get("remove_file") === "true";
 
-    // Validate required fields
     if (!title || !type || !expirationDate) {
       return NextResponse.json(
         {
-          error: "Missing required fields: title, type, and expiration_date are required",
+          error:
+            "Missing required fields: title, type, and expiration_date are required",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    // Validate title length
     if (title.length > 255) {
       return NextResponse.json(
         { error: "Title must be less than 255 characters" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    // Validate document type
-    const validTypes = ["Rent", "Insurance", "Subscription", "License", "Other"];
+    const validTypes = [
+      "Rent",
+      "Insurance",
+      "Subscription",
+      "License",
+      "Other",
+    ];
     if (!validTypes.includes(type)) {
       return NextResponse.json(
         { error: "Invalid document type" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    // Validate expiration date format
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (!dateRegex.test(expirationDate)) {
       return NextResponse.json(
         { error: "Invalid expiration date format" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -125,46 +128,60 @@ export async function PUT(
     let fileType = existingDoc.file_type;
     let fileSize = existingDoc.file_size;
 
-    // Handle file removal
     if (removeFile && existingDoc.file_path) {
-      try {
-        await deleteFile(existingDoc.file_path);
-      } catch (fileError) {
-        console.warn("Could not delete old file:", fileError);
+      const { error: deleteError } = await supabase.storage
+        .from("documents")
+        .remove([existingDoc.file_path]);
+
+      if (deleteError) {
+        console.warn("Could not delete old file:", deleteError);
       }
+
       filePath = null;
       fileName = null;
       fileType = null;
       fileSize = null;
     }
 
-    // Handle new file upload
     if (file && file.size > 0) {
-      // Delete old file if exists
       if (existingDoc.file_path) {
-        try {
-          await deleteFile(existingDoc.file_path);
-        } catch (fileError) {
-          console.warn("Could not delete old file:", fileError);
+        const { error: deleteError } = await supabase.storage
+          .from("documents")
+          .remove([existingDoc.file_path]);
+
+        if (deleteError) {
+          console.warn("Could not delete old file:", deleteError);
         }
       }
 
-      // Validate file size (10MB max)
       if (file.size > 10 * 1024 * 1024) {
         return NextResponse.json(
           { error: "File size must be less than 10MB" },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
-      const uploadedFile = await uploadFile(file, user.id);
-      filePath = uploadedFile.path;
+      const fileExt = file.name.split(".").pop();
+      const uploadFileName = `${user.id}/${Date.now()}.${fileExt}`;
+
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("documents")
+        .upload(uploadFileName, file);
+
+      if (uploadError) {
+        console.error("Error uploading file:", uploadError);
+        return NextResponse.json(
+          { error: "Error uploading file" },
+          { status: 500 },
+        );
+      }
+
+      filePath = uploadData.path;
       fileName = file.name;
       fileType = file.type;
       fileSize = file.size;
     }
 
-    // Update document in database
     const { data: updatedDocument, error: updateError } = await supabase
       .from("documents")
       .update({
@@ -188,7 +205,7 @@ export async function PUT(
       console.error("Error updating document:", updateError);
       return NextResponse.json(
         { error: "Error updating document" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -197,20 +214,19 @@ export async function PUT(
     console.error("Error updating document:", error);
     return NextResponse.json(
       { error: "Error updating document" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
-// DELETE - Delete a document
 export async function DELETE(
   _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
+    const supabase = await createSupabaseServerClient();
 
-    // Get the current user
     const {
       data: { user },
       error: authError,
@@ -220,7 +236,6 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // First, fetch the document to get file path and verify ownership
     const { data: document, error: fetchError } = await supabase
       .from("documents")
       .select("*")
@@ -229,20 +244,22 @@ export async function DELETE(
       .single();
 
     if (fetchError || !document) {
-      return NextResponse.json({ error: "Document not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Document not found" },
+        { status: 404 },
+      );
     }
 
-    // Delete the file from storage if it exists
     if (document.file_path) {
-      try {
-        await deleteFile(document.file_path);
-      } catch (fileError) {
-        console.warn("Could not delete file:", fileError);
-        // Continue with document deletion even if file deletion fails
+      const { error: deleteFileError } = await supabase.storage
+        .from("documents")
+        .remove([document.file_path]);
+
+      if (deleteFileError) {
+        console.warn("Could not delete file:", deleteFileError);
       }
     }
 
-    // Delete the document from the database
     const { error: deleteError } = await supabase
       .from("documents")
       .delete()
@@ -253,7 +270,7 @@ export async function DELETE(
       console.error("Error deleting document:", deleteError);
       return NextResponse.json(
         { error: "Error deleting document" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -262,7 +279,7 @@ export async function DELETE(
     console.error("Error deleting document:", error);
     return NextResponse.json(
       { error: "Error deleting document" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
