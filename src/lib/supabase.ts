@@ -9,7 +9,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Unified document types organized by category
 export type DocumentType =
   // Expiring Documents
   | "Rent Agreement"
@@ -26,7 +25,6 @@ export type DocumentType =
   | "Driving License"
   | "Voter ID"
   | "Birth Certificate"
-  // Other
   | "Other";
 
 export type DocumentCategory = "expiring" | "identity" | "other";
@@ -49,7 +47,6 @@ export interface Document {
   file_name?: string | null;
   file_type?: string | null;
   file_size?: number | null;
-  // Optional fields for identity documents
   document_number?: string | null;
   issue_date?: string | null;
   issuing_authority?: string | null;
@@ -65,7 +62,6 @@ export interface User {
   created_at?: string;
 }
 
-// Document type configuration with icons and colors
 export const DOCUMENT_TYPE_CONFIG: Record<
   DocumentType,
   {
@@ -76,7 +72,6 @@ export const DOCUMENT_TYPE_CONFIG: Record<
     hasDocumentNumber: boolean;
   }
 > = {
-  // Expiring Documents
   "Rent Agreement": {
     category: "expiring",
     color: "text-purple-600 dark:text-purple-400",
@@ -119,7 +114,6 @@ export const DOCUMENT_TYPE_CONFIG: Record<
     hasExpiry: true,
     hasDocumentNumber: false,
   },
-  // Identity Documents
   Citizenship: {
     category: "identity",
     color: "text-indigo-600 dark:text-indigo-400",

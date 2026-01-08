@@ -10,6 +10,7 @@ import {
   Edit,
   Trash2,
   Eye,
+  Download,
   Loader2,
   Calendar,
   Clock,
@@ -39,6 +40,7 @@ import {
   getDocuments,
   getDocumentStatus,
   getDaysUntilExpiration,
+  getFileDownloadUrl,
   type Document,
   type DocumentStatus,
   type DocumentType,
@@ -155,6 +157,19 @@ export default function DashboardPage() {
     }
   }, [refresh, user]);
 
+  // Listen for quick add document event from sidebar
+  useEffect(() => {
+    const handleAddDocument = () => {
+      setIsAddModalOpen(true);
+    };
+
+    window.addEventListener("open-add-document", handleAddDocument);
+
+    return () => {
+      window.removeEventListener("open-add-document", handleAddDocument);
+    };
+  }, []);
+
   const fetchDocuments = async (userId: string) => {
     try {
       const docs = await getDocuments(userId);
@@ -268,10 +283,25 @@ export default function DashboardPage() {
     setOpenMenuId(null);
   };
 
-  const handleDeleteClick = (doc: Document) => {
-    setSelectedDocument(doc);
+  const handleDeleteClick = (document: Document) => {
+    setSelectedDocument(document);
     setIsDeleteModalOpen(true);
-    setOpenMenuId(null);
+  };
+
+  const handleDownload = async (document: Document) => {
+    if (!document.file_path) {
+      alert("No file attached to this document");
+      return;
+    }
+
+    try {
+      setOpenMenuId(null);
+      const downloadUrl = await getFileDownloadUrl(document.file_path);
+      window.open(downloadUrl, "_blank");
+    } catch (error) {
+      console.error("Error downloading file:", error);
+      alert("Failed to download file");
+    }
   };
 
   const handleDeleteConfirm = async () => {
@@ -313,7 +343,7 @@ export default function DashboardPage() {
     <div className="flex min-h-screen bg-neutral-50 dark:bg-neutral-950">
       <Sidebar />
 
-      <div className="flex-1 md:ml-64">
+      <div className="flex-1 md:ml-72">
         <Header user={user} />
 
         <main className="p-4 md:p-6 lg:p-8 max-w-6xl mx-auto">
@@ -327,7 +357,7 @@ export default function DashboardPage() {
               <p className="text-2xl font-bold text-neutral-900 dark:text-white">
                 {stats.total}
               </p>
-              <p className="text-sm text-neutral-500">Total Documents</p>
+              <p className="text-sm text-neutral-500">Document Library</p>
             </motion.div>
 
             <motion.div
@@ -339,7 +369,7 @@ export default function DashboardPage() {
               <p className="text-2xl font-bold text-orange-600">
                 {stats.expiringSoon}
               </p>
-              <p className="text-sm text-neutral-500">Expiring Soon</p>
+              <p className="text-sm text-neutral-500">Renewal Required</p>
             </motion.div>
 
             <motion.div
@@ -349,7 +379,7 @@ export default function DashboardPage() {
               className="bg-white dark:bg-neutral-900 rounded-xl p-4 border border-neutral-200 dark:border-neutral-800"
             >
               <p className="text-2xl font-bold text-red-600">{stats.expired}</p>
-              <p className="text-sm text-neutral-500">Expired</p>
+              <p className="text-sm text-neutral-500">Overdue</p>
             </motion.div>
 
             <motion.div
@@ -361,7 +391,7 @@ export default function DashboardPage() {
               <p className="text-2xl font-bold text-blue-600">
                 {stats.identity}
               </p>
-              <p className="text-sm text-neutral-500">Identity Docs</p>
+              <p className="text-sm text-neutral-500">Identity Documents</p>
             </motion.div>
           </div>
 
@@ -372,7 +402,7 @@ export default function DashboardPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
               <input
                 type="text"
-                placeholder="Search documents..."
+                placeholder="Search document library..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[#A8BBA3] focus:border-transparent transition-all"
@@ -391,9 +421,9 @@ export default function DashboardPage() {
                       : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
                   }`}
                 >
-                  {tab === "all" && "All"}
-                  {tab === "expiring" && "Expiring"}
-                  {tab === "identity" && "Identity"}
+                  {tab === "all" && "All Documents"}
+                  {tab === "expiring" && "Renewal Required"}
+                  {tab === "identity" && "Identity Documents"}
                 </button>
               ))}
             </div>
@@ -404,7 +434,7 @@ export default function DashboardPage() {
               className="bg-[#A8BBA3] hover:bg-[#96ab91] text-white rounded-xl px-5"
             >
               <Plus className="h-4 w-4 mr-2" />
-              Add
+              Add Document
             </Button>
           </div>
 
@@ -419,12 +449,14 @@ export default function DashboardPage() {
                 <FileText className="h-8 w-8 text-neutral-400" />
               </div>
               <h3 className="text-lg font-semibold text-neutral-900 dark:text-white mb-1">
-                {searchQuery ? "No documents found" : "No documents yet"}
+                {searchQuery
+                  ? "No matching documents found"
+                  : "Document library is empty"}
               </h3>
               <p className="text-neutral-500 text-sm mb-4">
                 {searchQuery
-                  ? "Try a different search term"
-                  : "Add your first document to get started"}
+                  ? "Please refine your search criteria or browse all documents"
+                  : "Begin by adding your first document to the system"}
               </p>
               {!searchQuery && (
                 <Button
@@ -432,7 +464,7 @@ export default function DashboardPage() {
                   className="bg-[#A8BBA3] hover:bg-[#96ab91] text-white"
                 >
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Document
+                  Create New Document
                 </Button>
               )}
             </motion.div>
@@ -534,7 +566,7 @@ export default function DashboardPage() {
                                 initial={{ opacity: 0, scale: 0.95 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 exit={{ opacity: 0, scale: 0.95 }}
-                                className="absolute right-0 top-full mt-1 w-32 bg-white dark:bg-neutral-800 rounded-lg shadow-lg border border-neutral-200 dark:border-neutral-700 py-1 z-10"
+                                className="absolute right-0 top-full mt-1 w-40 bg-white dark:bg-neutral-800 rounded-lg shadow-lg border border-neutral-200 dark:border-neutral-700 py-1 z-10"
                               >
                                 <button
                                   onClick={() => handleView(doc)}
@@ -543,6 +575,15 @@ export default function DashboardPage() {
                                   <Eye className="h-4 w-4" />
                                   View
                                 </button>
+                                {doc.file_path && (
+                                  <button
+                                    onClick={() => handleDownload(doc)}
+                                    className="w-full px-3 py-2 text-left text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 flex items-center gap-2"
+                                  >
+                                    <Download className="h-4 w-4" />
+                                    Download
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => handleEdit(doc)}
                                   className="w-full px-3 py-2 text-left text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 flex items-center gap-2"
