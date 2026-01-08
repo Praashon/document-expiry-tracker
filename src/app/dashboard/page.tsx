@@ -348,8 +348,8 @@ export default function DashboardPage() {
     <div className="flex min-h-screen bg-neutral-50 dark:bg-neutral-950">
       <Sidebar />
 
-      <div className="flex-1 md:ml-72">
-        <Header user={user} />
+      <div className="flex-1 md:ml-16">
+        <Header user={user} sidebarCollapsed={true} />
 
         <main className="p-4 md:p-6 lg:p-8 max-w-6xl mx-auto">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">

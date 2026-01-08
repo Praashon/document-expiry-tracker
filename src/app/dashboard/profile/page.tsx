@@ -13,17 +13,14 @@ import {
   Calendar,
   Camera,
   Check,
-  X,
   Eye,
   EyeOff,
   AlertTriangle,
   Loader2,
   Lock,
-  Unlock,
-  Building2,
-  CreditCard,
   Globe,
   Trash2,
+  Copy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -77,17 +74,8 @@ function ProfilePageContent() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
-
-  useEffect(() => {
-    if (
-      tabFromUrl &&
-      ["profile", "security", "settings"].includes(tabFromUrl)
-    ) {
-      setActiveTab(tabFromUrl);
-    }
-  }, [tabFromUrl]);
-
   const [isSaving, setIsSaving] = useState(false);
+  const [totpSecret, setTotpSecret] = useState<string | null>(null);
 
   const [showPasswords, setShowPasswords] = useState({
     current: false,
@@ -112,6 +100,7 @@ function ProfilePageContent() {
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [verificationCode, setVerificationCode] = useState("");
   const [backupCodes, setBackupCodes] = useState<string[]>([]);
+  const [showBackupCodes, setShowBackupCodes] = useState(false);
 
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [desktopNotifications, setDesktopNotifications] = useState(false);
@@ -120,6 +109,22 @@ function ProfilePageContent() {
     type: "success" | "error";
     text: string;
   } | null>(null);
+
+  useEffect(() => {
+    if (
+      tabFromUrl &&
+      ["profile", "security", "settings"].includes(tabFromUrl)
+    ) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [tabFromUrl]);
+
+  useEffect(() => {
+    if (message) {
+      const timer = setTimeout(() => setMessage(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [message]);
 
   const handleDeleteAccount = async () => {
     if (deleteConfirmText !== "DELETE") {
@@ -166,9 +171,7 @@ function ProfilePageContent() {
   };
 
   const fetchProfileData = useCallback(async () => {
-    if (!user) {
-      return;
-    }
+    if (!user) return;
 
     setIsLoading(true);
 
@@ -241,6 +244,10 @@ function ProfilePageContent() {
       setDesktopNotifications(
         user.user_metadata?.desktop_notifications || false,
       );
+
+      if (user.user_metadata?.backup_codes) {
+        setBackupCodes(user.user_metadata.backup_codes);
+      }
     } catch (error) {
       console.error("Error fetching profile:", error);
       setMessage({ type: "error", text: "Failed to load profile data" });
@@ -275,6 +282,7 @@ function ProfilePageContent() {
       if (error) throw error;
 
       setMessage({ type: "success", text: "Profile updated successfully" });
+      await refreshUser();
       fetchProfileData();
     } catch (error: any) {
       setMessage({ type: "error", text: error.message });
@@ -331,6 +339,7 @@ function ProfilePageContent() {
         newPassword: "",
         confirmPassword: "",
       });
+      await refreshUser();
       fetchProfileData();
     } catch (error: any) {
       setMessage({ type: "error", text: error.message });
@@ -342,7 +351,10 @@ function ProfilePageContent() {
   const handleGooglePasswordSetup = async () => {
     if (!user || !profileData) return;
 
-    if (googlePasswordData.confirmEmail !== user.email) {
+    if (
+      googlePasswordData.confirmEmail.toLowerCase() !==
+      user.email?.toLowerCase()
+    ) {
       setMessage({
         type: "error",
         text: "Email confirmation does not match your account",
@@ -368,89 +380,145 @@ function ProfilePageContent() {
 
       const { error } = await supabase.auth.updateUser({
         password: googlePasswordData.newPassword,
-        data: { has_custom_password: true },
       });
 
       if (error) throw error;
+
+      const { error: metaError } = await supabase.auth.updateUser({
+        data: { has_custom_password: true },
+      });
+
+      if (metaError) throw metaError;
 
       setMessage({
         type: "success",
         text: "Password created successfully! You can now sign in with email and password.",
       });
+
       setGooglePasswordData({
         confirmEmail: "",
         newPassword: "",
         confirmPassword: "",
       });
-      fetchProfileData();
+
+      await refreshUser();
+      await fetchProfileData();
     } catch (error: any) {
-      setMessage({ type: "error", text: error.message });
+      setMessage({
+        type: "error",
+        text: error.message || "Failed to set password",
+      });
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleTwoFactorToggle = async () => {
-    if (!twoFactorEnabled) {
-      try {
-        setIsSaving(true);
-        setQrCode(
-          "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
-        );
-        setMessage({
-          type: "success",
-          text: "Scan the QR code with your authenticator app",
-        });
-      } catch (error: any) {
-        setMessage({ type: "error", text: error.message });
-      } finally {
-        setIsSaving(false);
+  const handleGenerateQRCode = async () => {
+    try {
+      setIsSaving(true);
+      setMessage(null);
+
+      const response = await fetch("/api/2fa", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "generate" }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to generate QR code");
       }
-    } else {
-      try {
-        setIsSaving(true);
-        await supabase.auth.updateUser({
-          data: { two_factor_enabled: false },
-        });
-        setTwoFactorEnabled(false);
-        setQrCode(null);
-        setMessage({
-          type: "success",
-          text: "Two-factor authentication disabled",
-        });
-      } catch (error: any) {
-        setMessage({ type: "error", text: error.message });
-      } finally {
-        setIsSaving(false);
-      }
+
+      setQrCode(data.qrCode);
+      setTotpSecret(data.secret);
+      setMessage({
+        type: "success",
+        text: "Scan the QR code with your authenticator app (Google Authenticator, Authy, etc.)",
+      });
+    } catch (error: any) {
+      setMessage({ type: "error", text: error.message });
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleVerify2FA = async () => {
-    if (!verificationCode) return;
+    if (!verificationCode || verificationCode.length !== 6) {
+      setMessage({ type: "error", text: "Please enter a valid 6-digit code" });
+      return;
+    }
 
     try {
       setIsSaving(true);
-      if (verificationCode === "123456") {
-        await supabase.auth.updateUser({
-          data: { two_factor_enabled: true },
-        });
-        setTwoFactorEnabled(true);
-        setBackupCodes(["ABC123", "DEF456", "GHI789", "JKL012", "MNO345"]);
-        setMessage({
-          type: "success",
-          text: "Two-factor authentication enabled successfully",
-        });
-        setVerificationCode("");
-        setQrCode(null);
-      } else {
-        throw new Error("Invalid verification code");
+
+      const response = await fetch("/api/2fa", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "verify", code: verificationCode }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Verification failed");
       }
+
+      setTwoFactorEnabled(true);
+      setBackupCodes(data.backupCodes);
+      setShowBackupCodes(true);
+      setVerificationCode("");
+      setQrCode(null);
+      setTotpSecret(null);
+      setMessage({
+        type: "success",
+        text: "Two-factor authentication enabled successfully! Save your backup codes.",
+      });
+
+      await refreshUser();
     } catch (error: any) {
       setMessage({ type: "error", text: error.message });
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleDisable2FA = async () => {
+    try {
+      setIsSaving(true);
+
+      const response = await fetch("/api/2fa", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "disable" }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to disable 2FA");
+      }
+
+      setTwoFactorEnabled(false);
+      setQrCode(null);
+      setBackupCodes([]);
+      setShowBackupCodes(false);
+      setMessage({
+        type: "success",
+        text: "Two-factor authentication disabled",
+      });
+
+      await refreshUser();
+    } catch (error: any) {
+      setMessage({ type: "error", text: error.message });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const copyBackupCodes = () => {
+    navigator.clipboard.writeText(backupCodes.join("\n"));
+    setMessage({ type: "success", text: "Backup codes copied to clipboard" });
   };
 
   const handleAvatarUpload = async (
@@ -463,11 +531,11 @@ function ProfilePageContent() {
       setIsSaving(true);
 
       const fileExt = file.name.split(".").pop();
-      const fileName = `${user?.id}-${Math.random()}.${fileExt}`;
+      const fileName = `${user?.id}-${Date.now()}.${fileExt}`;
 
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from("avatars")
-        .upload(fileName, file);
+        .upload(fileName, file, { upsert: true });
 
       if (error) throw error;
 
@@ -487,8 +555,8 @@ function ProfilePageContent() {
     return (
       <div className="flex min-h-screen bg-neutral-50 dark:bg-neutral-950">
         <Sidebar />
-        <div className="flex-1 md:ml-72">
-          <Header user={user} />
+        <div className="flex-1 md:ml-16">
+          <Header user={user} sidebarCollapsed={true} />
           <div className="flex items-center justify-center h-96">
             <Loader2 className="h-8 w-8 animate-spin text-[#A8BBA3]" />
           </div>
@@ -501,8 +569,8 @@ function ProfilePageContent() {
     <div className="flex min-h-screen bg-neutral-50 dark:bg-neutral-950">
       <Sidebar />
 
-      <div className="flex-1 md:ml-72">
-        <Header user={user} />
+      <div className="flex-1 md:ml-16">
+        <Header user={user} sidebarCollapsed={true} />
 
         <main className="p-4 md:p-6 lg:p-8 max-w-4xl mx-auto">
           <div className="mb-8">
@@ -810,9 +878,13 @@ function ProfilePageContent() {
                         className="w-full"
                       >
                         {isSaving ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        ) : null}
-                        Establish Password
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            Setting up...
+                          </>
+                        ) : (
+                          "Establish Password"
+                        )}
                       </Button>
                     </div>
                   ) : (
@@ -937,9 +1009,13 @@ function ProfilePageContent() {
                         className="w-full"
                       >
                         {isSaving ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        ) : null}
-                        Change Password
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            Updating...
+                          </>
+                        ) : (
+                          "Change Password"
+                        )}
                       </Button>
                     </div>
                   )}
@@ -970,71 +1046,178 @@ function ProfilePageContent() {
                           : "Strengthen account security with 2FA"}
                       </p>
                     </div>
-                    <Switch
-                      checked={twoFactorEnabled}
-                      onCheckedChange={handleTwoFactorToggle}
-                      disabled={isSaving}
-                    />
+                    <Badge variant={twoFactorEnabled ? "default" : "secondary"}>
+                      {twoFactorEnabled ? "Enabled" : "Disabled"}
+                    </Badge>
                   </div>
+
+                  {!twoFactorEnabled && !qrCode && (
+                    <Button
+                      onClick={handleGenerateQRCode}
+                      disabled={isSaving}
+                      className="w-full"
+                    >
+                      {isSaving ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Shield className="h-4 w-4 mr-2" />
+                          Enable Two-Factor Authentication
+                        </>
+                      )}
+                    </Button>
+                  )}
 
                   {qrCode && !twoFactorEnabled && (
                     <div className="space-y-4 p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg">
-                      <div className="text-center">
-                        <img
-                          src={qrCode}
-                          alt="2FA QR Code"
-                          className="mx-auto h-32 w-32 bg-white p-2 rounded-lg"
-                        />
-                        <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-2">
-                          Scan with your preferred authenticator application
-                        </p>
+                      <div className="text-center space-y-4">
+                        <div className="inline-block p-4 bg-white rounded-lg shadow-sm">
+                          <img
+                            src={qrCode}
+                            alt="2FA QR Code"
+                            className="h-48 w-48"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                            Scan with Google Authenticator, Authy, or similar
+                            app
+                          </p>
+                          {totpSecret && (
+                            <div className="p-2 bg-neutral-100 dark:bg-neutral-700 rounded text-xs font-mono break-all">
+                              <span className="text-neutral-500">
+                                Manual entry:{" "}
+                              </span>
+                              {totpSecret}
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       <div className="space-y-2">
                         <Label htmlFor="verificationCode">
-                          Verification Code
+                          Enter 6-digit code from your app
                         </Label>
                         <Input
                           id="verificationCode"
                           value={verificationCode}
-                          onChange={(e) => setVerificationCode(e.target.value)}
-                          placeholder="Enter 6-digit code"
+                          onChange={(e) =>
+                            setVerificationCode(
+                              e.target.value.replace(/\D/g, "").slice(0, 6),
+                            )
+                          }
+                          placeholder="000000"
                           maxLength={6}
+                          className="text-center text-2xl tracking-widest font-mono"
                         />
                       </div>
 
-                      <Button
-                        onClick={handleVerify2FA}
-                        disabled={isSaving || verificationCode.length !== 6}
-                        className="w-full"
-                      >
-                        {isSaving ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        ) : null}
-                        Verify & Enable 2FA
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setQrCode(null);
+                            setTotpSecret(null);
+                            setVerificationCode("");
+                          }}
+                          className="flex-1"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={handleVerify2FA}
+                          disabled={isSaving || verificationCode.length !== 6}
+                          className="flex-1"
+                        >
+                          {isSaving ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                              Verifying...
+                            </>
+                          ) : (
+                            "Verify & Enable"
+                          )}
+                        </Button>
+                      </div>
                     </div>
                   )}
 
-                  {twoFactorEnabled && backupCodes.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="font-medium text-neutral-900 dark:text-white">
-                        Backup Codes
-                      </p>
-                      <p className="text-sm text-neutral-500 mb-2">
-                        Save these codes in a safe place. Use them if you lose
-                        access to your authenticator app.
-                      </p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {backupCodes.map((code, index) => (
-                          <code
-                            key={index}
-                            className="p-2 bg-neutral-100 dark:bg-neutral-800 rounded text-sm font-mono"
-                          >
-                            {code}
-                          </code>
-                        ))}
+                  {twoFactorEnabled && (
+                    <div className="space-y-4">
+                      <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <Check className="h-5 w-5 text-green-600" />
+                          <span className="font-medium text-green-900 dark:text-green-400">
+                            Two-factor authentication is active
+                          </span>
+                        </div>
                       </div>
+
+                      {backupCodes.length > 0 && (
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <p className="font-medium text-neutral-900 dark:text-white">
+                              Backup Codes
+                            </p>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                setShowBackupCodes(!showBackupCodes)
+                              }
+                            >
+                              {showBackupCodes ? "Hide" : "Show"}
+                            </Button>
+                          </div>
+
+                          {showBackupCodes && (
+                            <div className="space-y-2">
+                              <p className="text-sm text-neutral-500">
+                                Save these codes securely. Each can only be used
+                                once.
+                              </p>
+                              <div className="grid grid-cols-2 gap-2">
+                                {backupCodes.map((code, index) => (
+                                  <code
+                                    key={index}
+                                    className="p-2 bg-neutral-100 dark:bg-neutral-800 rounded text-sm font-mono text-center"
+                                  >
+                                    {code}
+                                  </code>
+                                ))}
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={copyBackupCodes}
+                                className="w-full"
+                              >
+                                <Copy className="h-4 w-4 mr-2" />
+                                Copy All Codes
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <Button
+                        variant="destructive"
+                        onClick={handleDisable2FA}
+                        disabled={isSaving}
+                        className="w-full"
+                      >
+                        {isSaving ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            Disabling...
+                          </>
+                        ) : (
+                          "Disable Two-Factor Authentication"
+                        )}
+                      </Button>
                     </div>
                   )}
                 </CardContent>
@@ -1257,7 +1440,7 @@ export default function ProfilePage() {
       fallback={
         <div className="flex min-h-screen bg-neutral-50 dark:bg-neutral-950">
           <Sidebar />
-          <div className="flex-1 md:ml-72">
+          <div className="flex-1 md:ml-16">
             <div className="flex items-center justify-center h-96">
               <Loader2 className="h-8 w-8 animate-spin text-[#A8BBA3]" />
             </div>

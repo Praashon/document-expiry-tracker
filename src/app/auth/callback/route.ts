@@ -25,15 +25,27 @@ export async function GET(request: NextRequest) {
             });
           },
         },
-      }
+      },
     );
 
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
-    if (!error) {
+    if (!error && data.user) {
+      // Check if user has 2FA enabled
+      const twoFactorEnabled = data.user.user_metadata?.two_factor_enabled;
+
+      if (twoFactorEnabled) {
+        // Redirect to 2FA verification page for OAuth users
+        return NextResponse.redirect(
+          new URL("/login?step=2fa&provider=oauth", requestUrl.origin),
+        );
+      }
+
       return NextResponse.redirect(new URL(next, requestUrl.origin));
     }
   }
 
-  return NextResponse.redirect(new URL("/login?error=auth_callback_error", requestUrl.origin));
+  return NextResponse.redirect(
+    new URL("/login?error=auth_callback_error", requestUrl.origin),
+  );
 }

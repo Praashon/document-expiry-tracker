@@ -89,7 +89,7 @@ export default function AnalyticsPage() {
 
       const now = new Date();
       const thirtyDaysFromNow = new Date(
-        now.getTime() + 30 * 24 * 60 * 60 * 1000
+        now.getTime() + 30 * 24 * 60 * 60 * 1000,
       );
 
       // Calculate stats
@@ -146,7 +146,7 @@ export default function AnalyticsPage() {
           category: category.charAt(0).toUpperCase() + category.slice(1),
           count,
           color: categoryColors[category] || categoryColors.other,
-        })
+        }),
       );
       setCategoryData(catData);
 
@@ -170,7 +170,7 @@ export default function AnalyticsPage() {
           ?.sort(
             (a, b) =>
               new Date(b.created_at).getTime() -
-              new Date(a.created_at).getTime()
+              new Date(a.created_at).getTime(),
           )
           .slice(0, 5)
           .map((doc) => ({
@@ -196,8 +196,8 @@ export default function AnalyticsPage() {
     return (
       <div className="flex min-h-screen bg-neutral-50 dark:bg-neutral-950">
         <Sidebar />
-        <div className="flex-1 md:ml-72">
-          <Header user={user} />
+        <div className="flex-1 md:ml-16">
+          <Header user={user} sidebarCollapsed={true} />
           <div className="flex items-center justify-center h-96">
             <Loader2 className="h-8 w-8 animate-spin text-[#A8BBA3]" />
           </div>
@@ -208,7 +208,7 @@ export default function AnalyticsPage() {
 
   const maxMonthlyValue = Math.max(
     ...monthlyData.map((d) => Math.max(d.added, d.expired)),
-    1
+    1,
   );
   const totalCategoryCount = categoryData.reduce((sum, c) => sum + c.count, 0);
 
@@ -216,8 +216,8 @@ export default function AnalyticsPage() {
     <div className="flex min-h-screen bg-neutral-50 dark:bg-neutral-950">
       <Sidebar />
 
-      <div className="flex-1 md:ml-72">
-        <Header user={user} />
+      <div className="flex-1 md:ml-16">
+        <Header user={user} sidebarCollapsed={true} />
 
         <main className="p-4 md:p-6 lg:p-8">
           {/* Page Header */}
@@ -258,7 +258,10 @@ export default function AnalyticsPage() {
                 icon: CheckCircle,
                 color: "text-green-600",
                 bgColor: "bg-green-100 dark:bg-green-900/20",
-                trend: stats.total > 0 ? Math.round((stats.active / stats.total) * 100) : 0,
+                trend:
+                  stats.total > 0
+                    ? Math.round((stats.active / stats.total) * 100)
+                    : 0,
                 trendUp: true,
               },
               {
@@ -267,7 +270,10 @@ export default function AnalyticsPage() {
                 icon: Clock,
                 color: "text-orange-600",
                 bgColor: "bg-orange-100 dark:bg-orange-900/20",
-                trend: stats.total > 0 ? Math.round((stats.expiringSoon / stats.total) * 100) : 0,
+                trend:
+                  stats.total > 0
+                    ? Math.round((stats.expiringSoon / stats.total) * 100)
+                    : 0,
                 trendUp: false,
               },
               {
@@ -276,7 +282,10 @@ export default function AnalyticsPage() {
                 icon: AlertCircle,
                 color: "text-red-600",
                 bgColor: "bg-red-100 dark:bg-red-900/20",
-                trend: stats.total > 0 ? Math.round((stats.expired / stats.total) * 100) : 0,
+                trend:
+                  stats.total > 0
+                    ? Math.round((stats.expired / stats.total) * 100)
+                    : 0,
                 trendUp: false,
               },
             ].map((stat, index) => (
@@ -377,7 +386,9 @@ export default function AnalyticsPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full bg-red-400" />
-                        <span className="text-xs text-neutral-500">Expired</span>
+                        <span className="text-xs text-neutral-500">
+                          Expired
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -412,7 +423,9 @@ export default function AnalyticsPage() {
                             </span>
                             <span className="text-neutral-500">
                               {cat.count} (
-                              {Math.round((cat.count / totalCategoryCount) * 100)}
+                              {Math.round(
+                                (cat.count / totalCategoryCount) * 100,
+                              )}
                               %)
                             </span>
                           </div>
@@ -494,7 +507,9 @@ export default function AnalyticsPage() {
                   <div className="text-center py-8 text-neutral-500">
                     <Calendar className="h-12 w-12 mx-auto mb-3 opacity-50" />
                     <p>No recent activity</p>
-                    <p className="text-sm">Your document activity will appear here</p>
+                    <p className="text-sm">
+                      Your document activity will appear here
+                    </p>
                   </div>
                 )}
               </CardContent>
