@@ -13,11 +13,27 @@ import {
   ArrowLeft,
   CheckCircle,
   AlertCircle,
-  Wand2,
+  Hash,
+  Building,
+  Home,
+  Shield,
+  CreditCard,
+  Car,
+  ScrollText,
+  Vote,
+  Bookmark,
+  FileCheck,
+  Receipt,
+  Package,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { DocumentType } from "@/lib/supabase";
+import {
+  DocumentType,
+  DOCUMENT_TYPE_CONFIG,
+  DOCUMENT_TYPES_BY_CATEGORY,
+} from "@/lib/supabase";
+import { processDocument, type ExtractedDocumentData } from "@/lib/ocr";
 
 interface AddDocumentModalProps {
   isOpen: boolean;
@@ -28,13 +44,23 @@ interface AddDocumentModalProps {
 type Mode = "select" | "automatic" | "manual";
 type AutomaticStep = "upload" | "processing" | "review";
 
-const documentTypes: DocumentType[] = [
-  "Rent",
-  "Insurance",
-  "Subscription",
-  "License",
-  "Other",
-];
+// Icon mapping for document types
+const TYPE_ICONS: Record<DocumentType, React.ElementType> = {
+  "Rent Agreement": Home,
+  Insurance: Shield,
+  Subscription: Bookmark,
+  License: FileCheck,
+  Warranty: Package,
+  Contract: ScrollText,
+  Citizenship: FileText,
+  "PAN Card": CreditCard,
+  "National ID": CreditCard,
+  Passport: FileText,
+  "Driving License": Car,
+  "Voter ID": Vote,
+  "Birth Certificate": ScrollText,
+  Other: FileText,
+};
 
 export function AddDocumentModal({
   isOpen,
@@ -46,20 +72,23 @@ export function AddDocumentModal({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState<string>("");
+
+  // Form state
   const [title, setTitle] = useState("");
   const [type, setType] = useState<DocumentType>("Other");
   const [expirationDate, setExpirationDate] = useState("");
   const [reminderDate, setReminderDate] = useState("");
   const [notes, setNotes] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [documentNumber, setDocumentNumber] = useState("");
+  const [issueDate, setIssueDate] = useState("");
+  const [issuingAuthority, setIssuingAuthority] = useState("");
+
+  // OCR state
   const [ocrProcessed, setOcrProcessed] = useState(false);
-  const [extractedData, setExtractedData] = useState<{
-    title: string | null;
-    type: DocumentType;
-    expiration_date: string | null;
-    raw_text: string;
-    dates_found: string[];
-  } | null>(null);
+  const [extractedData, setExtractedData] =
+    useState<ExtractedDocumentData | null>(null);
 
   const resetForm = () => {
     setMode("select");
@@ -70,7 +99,11 @@ export function AddDocumentModal({
     setReminderDate("");
     setNotes("");
     setFile(null);
+    setDocumentNumber("");
+    setIssueDate("");
+    setIssuingAuthority("");
     setError(null);
+    setProcessingStatus("");
     setOcrProcessed(false);
     setExtractedData(null);
   };
@@ -116,12 +149,69 @@ export function AddDocumentModal({
 
     setAutomaticStep("processing");
     setError(null);
+    setProcessingStatus("Initializing...");
+
+    try {
+      setProcessingStatus("Loading language data...");
+
+      const extracted = await processDocument(file, (progress) => {
+        if (progress < 50) {
+          setProcessingStatus("Analyzing document...");
+        } else if (progress < 90) {
+          setProcessingStatus("Extracting text...");
+        } else {
+          setProcessingStatus("Processing results...");
+        }
+      });
+
+      setExtractedData(extracted);
+
+      if (extracted.title) setTitle(extracted.title);
+      if (extracted.type) setType(extracted.type as DocumentType);
+      if (extracted.expiration_date)
+        setExpirationDate(extracted.expiration_date);
+
+      setOcrProcessed(true);
+      setAutomaticStep("review");
+    } catch (err) {
+      console.error("OCR Error:", err);
+      setError(
+        err instanceof Error ? err.message : "Failed to process document",
+      );
+      setAutomaticStep("upload");
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!title.trim()) {
+      setError("Title is required");
+      return;
+    }
+
+    const config = DOCUMENT_TYPE_CONFIG[type];
+    if (config.hasExpiry && !expirationDate) {
+      setError("Expiration date is required for this document type");
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
 
     try {
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("title", title.trim());
+      formData.append("type", type);
+      if (expirationDate) formData.append("expiration_date", expirationDate);
+      if (reminderDate) formData.append("reminder_date", reminderDate);
+      if (notes.trim()) formData.append("notes", notes.trim());
+      if (documentNumber.trim())
+        formData.append("document_number", documentNumber.trim());
+      if (issueDate) formData.append("issue_date", issueDate);
+      if (issuingAuthority.trim())
+        formData.append("issuing_authority", issuingAuthority.trim());
+      if (file) formData.append("file", file);
 
-      const response = await fetch("/api/ocr", {
+      const response = await fetch("/api/documents", {
         method: "POST",
         body: formData,
       });
@@ -129,542 +219,498 @@ export function AddDocumentModal({
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to process document");
-      }
-
-      setExtractedData(data.extracted);
-
-      if (data.extracted.title) {
-        setTitle(data.extracted.title);
-      }
-      if (data.extracted.type) {
-        setType(data.extracted.type);
-      }
-      if (data.extracted.expiration_date) {
-        setExpirationDate(data.extracted.expiration_date);
-      }
-
-      setOcrProcessed(true);
-      setAutomaticStep("review");
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Error processing document",
-      );
-      setAutomaticStep("upload");
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-
-    if (!title.trim()) {
-      setError("Please enter a document title");
-      return;
-    }
-
-    if (!expirationDate) {
-      setError("Please select an expiration date");
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      const formData = new FormData();
-      formData.append("title", title.trim());
-      formData.append("type", type);
-      formData.append("expiration_date", expirationDate);
-
-      if (reminderDate) {
-        formData.append("reminder_date", reminderDate);
-      }
-
-      if (notes.trim()) {
-        formData.append("notes", notes.trim());
-      }
-
-      if (file) {
-        formData.append("file", file);
-      }
-
-      const response = await fetch("/api/documents", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
         throw new Error(data.error || "Failed to create document");
       }
 
-      resetForm();
       onSuccess();
-      onClose();
+      handleClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      console.error("Submit error:", err);
+      setError(err instanceof Error ? err.message : "Failed to save document");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return bytes + " B";
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
-  };
+  const config = DOCUMENT_TYPE_CONFIG[type];
+  const TypeIcon = TYPE_ICONS[type] || FileText;
 
-  const goBack = () => {
-    if (mode === "automatic" && automaticStep === "review") {
-      setAutomaticStep("upload");
-      setOcrProcessed(false);
-    } else {
-      setMode("select");
-      setFile(null);
-      setOcrProcessed(false);
-      setExtractedData(null);
-    }
-    setError(null);
-  };
+  if (!isOpen) return null;
 
   return (
     <AnimatePresence>
       {isOpen && (
-        <>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={handleClose}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
           />
 
+          {/* Modal */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-lg max-h-[90vh] overflow-y-auto"
+            transition={{ duration: 0.2 }}
+            className="relative w-full max-w-lg bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl overflow-hidden"
           >
-            <div className="bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl border border-neutral-200 dark:border-neutral-800">
-              <div className="flex items-center justify-between p-6 border-b border-neutral-200 dark:border-neutral-800">
-                <div className="flex items-center gap-3">
-                  {mode !== "select" && (
-                    <button
-                      onClick={goBack}
-                      className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition-colors mr-1"
-                    >
-                      <ArrowLeft className="w-4 h-4 text-neutral-500" />
-                    </button>
-                  )}
-                  <div className="p-2 bg-[#A8BBA3]/10 rounded-lg">
-                    <FileText className="w-5 h-5 text-[#A8BBA3]" />
-                  </div>
-                  <h2 className="text-xl font-semibold text-neutral-900 dark:text-white">
-                    {mode === "select"
-                      ? "Add New Document"
-                      : mode === "automatic"
-                        ? automaticStep === "upload"
-                          ? "Upload Document"
-                          : automaticStep === "processing"
-                            ? "Processing..."
-                            : "Review & Edit"
-                        : "Manual Entry"}
-                  </h2>
-                </div>
-                <button
-                  onClick={handleClose}
-                  className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition-colors"
-                >
-                  <X className="w-5 h-5 text-neutral-500" />
-                </button>
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-neutral-200 dark:border-neutral-800">
+              <div className="flex items-center gap-3">
+                {mode !== "select" && (
+                  <button
+                    onClick={() => {
+                      if (mode === "automatic" && automaticStep !== "upload") {
+                        setAutomaticStep("upload");
+                      } else {
+                        setMode("select");
+                        resetForm();
+                      }
+                    }}
+                    className="p-1.5 -ml-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                  >
+                    <ArrowLeft className="h-4 w-4 text-neutral-500" />
+                  </button>
+                )}
+                <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">
+                  {mode === "select" && "Add Document"}
+                  {mode === "automatic" && "Scan Document"}
+                  {mode === "manual" && "New Document"}
+                </h2>
               </div>
+              <button
+                onClick={handleClose}
+                className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+              >
+                <X className="h-5 w-5 text-neutral-500" />
+              </button>
+            </div>
 
-              <div className="p-6">
-                {mode === "select" && (
-                  <div className="space-y-4">
-                    <p className="text-neutral-600 dark:text-neutral-400 text-sm">
-                      Choose how you want to add your document:
+            {/* Content */}
+            <div className="p-5 max-h-[70vh] overflow-y-auto">
+              {/* Error Display */}
+              <AnimatePresence>
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400 text-sm flex items-center gap-2"
+                  >
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    {error}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Mode Selection */}
+              {mode === "select" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => setMode("automatic")}
+                    className="group p-6 rounded-xl border-2 border-neutral-200 dark:border-neutral-700 hover:border-[#A8BBA3] dark:hover:border-[#A8BBA3] transition-all text-left"
+                  >
+                    <div className="p-3 rounded-xl bg-[#A8BBA3]/10 w-fit mb-3 group-hover:bg-[#A8BBA3]/20 transition-colors">
+                      <Sparkles className="h-6 w-6 text-[#A8BBA3]" />
+                    </div>
+                    <h3 className="font-semibold text-neutral-900 dark:text-white mb-1">
+                      Scan Document
+                    </h3>
+                    <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                      Auto-extract details with OCR
                     </p>
+                  </button>
 
-                    <div className="grid grid-cols-1 gap-3">
-                      <button
-                        onClick={() => setMode("automatic")}
-                        className="group relative p-5 rounded-xl border-2 border-neutral-200 dark:border-neutral-700 hover:border-[#A8BBA3] dark:hover:border-[#A8BBA3] transition-all text-left"
-                      >
-                        <div className="flex items-start gap-4">
-                          <div className="p-3 bg-gradient-to-br from-[#A8BBA3]/20 to-emerald-500/20 rounded-xl group-hover:scale-110 transition-transform">
-                            <Wand2 className="w-6 h-6 text-[#A8BBA3]" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-semibold text-neutral-900 dark:text-white">
-                                Automatic
-                              </h3>
-                              <span className="px-2 py-0.5 bg-[#A8BBA3]/10 text-[#A8BBA3] text-xs font-medium rounded-full">
-                                Smart
-                              </span>
-                            </div>
-                            <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
-                              Upload your document and we&apos;ll extract the
-                              title, type, and expiration date automatically
-                              using OCR.
-                            </p>
-                          </div>
-                        </div>
-                        <Sparkles className="absolute top-3 right-3 w-4 h-4 text-[#A8BBA3]/40" />
-                      </button>
-
-                      <button
-                        onClick={() => setMode("manual")}
-                        className="group p-5 rounded-xl border-2 border-neutral-200 dark:border-neutral-700 hover:border-[#A8BBA3] dark:hover:border-[#A8BBA3] transition-all text-left"
-                      >
-                        <div className="flex items-start gap-4">
-                          <div className="p-3 bg-neutral-100 dark:bg-neutral-800 rounded-xl group-hover:scale-110 transition-transform">
-                            <PenLine className="w-6 h-6 text-neutral-600 dark:text-neutral-400" />
-                          </div>
-                          <div className="flex-1">
-                            <h3 className="font-semibold text-neutral-900 dark:text-white">
-                              Manual Entry
-                            </h3>
-                            <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
-                              Fill in the document details yourself. You can
-                              optionally attach a file.
-                            </p>
-                          </div>
-                        </div>
-                      </button>
+                  <button
+                    onClick={() => setMode("manual")}
+                    className="group p-6 rounded-xl border-2 border-neutral-200 dark:border-neutral-700 hover:border-[#A8BBA3] dark:hover:border-[#A8BBA3] transition-all text-left"
+                  >
+                    <div className="p-3 rounded-xl bg-neutral-100 dark:bg-neutral-800 w-fit mb-3 group-hover:bg-neutral-200 dark:group-hover:bg-neutral-700 transition-colors">
+                      <PenLine className="h-6 w-6 text-neutral-600 dark:text-neutral-400" />
                     </div>
-                  </div>
-                )}
-
-                {mode === "automatic" && automaticStep === "upload" && (
-                  <div className="space-y-4">
-                    {error && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm flex items-center gap-2"
-                      >
-                        <AlertCircle className="w-4 h-4 shrink-0" />
-                        {error}
-                      </motion.div>
-                    )}
-
-                    <p className="text-neutral-600 dark:text-neutral-400 text-sm">
-                      Upload a clear image or PDF of your document. We&apos;ll
-                      use OCR to extract the information.
+                    <h3 className="font-semibold text-neutral-900 dark:text-white mb-1">
+                      Manual Entry
+                    </h3>
+                    <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                      Fill in document details
                     </p>
+                  </button>
+                </div>
+              )}
 
-                    <div
-                      onDragEnter={handleDrag}
-                      onDragLeave={handleDrag}
-                      onDragOver={handleDrag}
-                      onDrop={handleDrop}
-                      className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all ${
-                        dragActive
-                          ? "border-[#A8BBA3] bg-[#A8BBA3]/5"
-                          : file
-                            ? "border-[#A8BBA3] bg-[#A8BBA3]/5"
-                            : "border-neutral-200 dark:border-neutral-700 hover:border-[#A8BBA3]"
-                      }`}
-                    >
-                      {file ? (
-                        <div className="space-y-3">
-                          <div className="w-12 h-12 bg-[#A8BBA3]/10 rounded-full flex items-center justify-center mx-auto">
-                            <CheckCircle className="w-6 h-6 text-[#A8BBA3]" />
-                          </div>
-                          <div>
-                            <p className="font-medium text-neutral-900 dark:text-white">
-                              {file.name}
-                            </p>
-                            <p className="text-sm text-neutral-500">
-                              {formatFileSize(file.size)}
-                            </p>
-                          </div>
-                          <button
-                            onClick={() => setFile(null)}
-                            className="text-sm text-red-500 hover:text-red-600"
-                          >
-                            Remove file
-                          </button>
-                        </div>
-                      ) : (
-                        <>
-                          <Upload className="w-10 h-10 text-neutral-400 mx-auto mb-3" />
-                          <p className="text-neutral-600 dark:text-neutral-400">
-                            Drag and drop your document here, or{" "}
-                            <label className="text-[#A8BBA3] cursor-pointer hover:underline font-medium">
-                              browse
-                              <input
-                                type="file"
-                                onChange={handleFileChange}
-                                className="hidden"
-                                accept="image/*,application/pdf"
-                              />
-                            </label>
-                          </p>
-                          <p className="text-xs text-neutral-400 mt-2">
-                            Supports: JPEG, PNG, WebP, PDF (max 10MB)
-                          </p>
-                        </>
-                      )}
-                    </div>
-
-                    <Button
-                      onClick={processWithOCR}
-                      disabled={!file}
-                      className="w-full"
-                    >
-                      <Sparkles className="w-4 h-4 mr-2" />
-                      Extract Information
-                    </Button>
-                  </div>
-                )}
-
-                {mode === "automatic" && automaticStep === "processing" && (
-                  <div className="py-12 text-center space-y-4">
-                    <div className="relative w-16 h-16 mx-auto">
-                      <div className="absolute inset-0 border-4 border-[#A8BBA3]/20 rounded-full" />
-                      <div className="absolute inset-0 border-4 border-[#A8BBA3] rounded-full border-t-transparent animate-spin" />
-                      <Wand2 className="absolute inset-0 m-auto w-6 h-6 text-[#A8BBA3]" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-neutral-900 dark:text-white">
-                        Analyzing your document...
-                      </p>
-                      <p className="text-sm text-neutral-500 mt-1">
-                        Extracting text and identifying key information
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {((mode === "automatic" && automaticStep === "review") ||
-                  mode === "manual") && (
-                  <form onSubmit={handleSubmit} className="space-y-5">
-                    {error && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm flex items-center gap-2"
-                      >
-                        <AlertCircle className="w-4 h-4 shrink-0" />
-                        {error}
-                      </motion.div>
+              {/* Automatic Mode - Upload */}
+              {mode === "automatic" && automaticStep === "upload" && (
+                <div className="space-y-4">
+                  <div
+                    onDragEnter={handleDrag}
+                    onDragLeave={handleDrag}
+                    onDragOver={handleDrag}
+                    onDrop={handleDrop}
+                    className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all ${
+                      dragActive
+                        ? "border-[#A8BBA3] bg-[#A8BBA3]/5"
+                        : file
+                          ? "border-green-500 bg-green-50 dark:bg-green-900/10"
+                          : "border-neutral-300 dark:border-neutral-700 hover:border-neutral-400 dark:hover:border-neutral-600"
+                    }`}
+                  >
+                    <input
+                      type="file"
+                      onChange={handleFileChange}
+                      accept="image/*,.pdf"
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    {file ? (
+                      <div className="space-y-2">
+                        <CheckCircle className="h-10 w-10 text-green-500 mx-auto" />
+                        <p className="font-medium text-neutral-900 dark:text-white">
+                          {file.name}
+                        </p>
+                        <p className="text-sm text-neutral-500">
+                          {(file.size / 1024 / 1024).toFixed(2)} MB
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Upload className="h-10 w-10 text-neutral-400 mx-auto" />
+                        <p className="font-medium text-neutral-900 dark:text-white">
+                          Drop your document here
+                        </p>
+                        <p className="text-sm text-neutral-500">
+                          or click to browse
+                        </p>
+                      </div>
                     )}
+                  </div>
 
-                    {ocrProcessed && extractedData && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-green-600 dark:text-green-400 text-sm flex items-center gap-2"
-                      >
-                        <CheckCircle className="w-4 h-4 shrink-0" />
-                        <span>
-                          Document analyzed! Review and edit the extracted
-                          information below.
-                        </span>
-                      </motion.div>
-                    )}
+                  <Button
+                    onClick={processWithOCR}
+                    disabled={!file}
+                    className="w-full bg-[#A8BBA3] hover:bg-[#96ab91] text-white h-11"
+                  >
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Extract Details
+                  </Button>
+                </div>
+              )}
 
+              {/* Automatic Mode - Processing */}
+              {mode === "automatic" && automaticStep === "processing" && (
+                <div className="py-12 text-center space-y-4">
+                  <div className="relative w-16 h-16 mx-auto">
+                    <Loader2 className="h-16 w-16 text-[#A8BBA3] animate-spin" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-neutral-900 dark:text-white">
+                      Processing Document
+                    </p>
+                    <p className="text-sm text-neutral-500 mt-1">
+                      {processingStatus}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Automatic Mode - Review / Manual Mode - Form */}
+              {(mode === "manual" ||
+                (mode === "automatic" && automaticStep === "review")) && (
+                <div className="space-y-5">
+                  {/* Document Type Selection */}
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                      Document Type
+                    </label>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                        Document Title <span className="text-red-500">*</span>
-                      </label>
-                      <Input
-                        type="text"
-                        placeholder="e.g., Car Insurance Policy"
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        disabled={isLoading}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                        Document Type <span className="text-red-500">*</span>
-                      </label>
-                      <div className="grid grid-cols-3 gap-2">
-                        {documentTypes.map((docType) => (
-                          <button
-                            key={docType}
-                            type="button"
-                            onClick={() => setType(docType)}
-                            disabled={isLoading}
-                            className={`px-3 py-2 text-sm font-medium rounded-lg border transition-all ${
-                              type === docType
-                                ? "bg-[#A8BBA3] text-white border-[#A8BBA3]"
-                                : "bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-700 hover:border-[#A8BBA3]"
-                            }`}
-                          >
-                            {docType}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                          Expiration Date{" "}
-                          <span className="text-red-500">*</span>
-                        </label>
-                        <div className="relative">
-                          <Input
-                            type="date"
-                            value={expirationDate}
-                            onChange={(e) => setExpirationDate(e.target.value)}
-                            disabled={isLoading}
-                            className="pl-10"
-                          />
-                          <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                          Reminder Date
-                        </label>
-                        <div className="relative">
-                          <Input
-                            type="date"
-                            value={reminderDate}
-                            onChange={(e) => setReminderDate(e.target.value)}
-                            disabled={isLoading}
-                            className="pl-10"
-                          />
-                          <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                        Notes
-                      </label>
-                      <textarea
-                        placeholder="Add any additional notes..."
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        disabled={isLoading}
-                        rows={3}
-                        className="flex w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm ring-offset-white placeholder:text-neutral-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#A8BBA3] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-neutral-800 dark:bg-neutral-950 dark:ring-offset-neutral-950 dark:placeholder:text-neutral-400 resize-none"
-                      />
-                    </div>
-
-                    {mode === "manual" && (
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                          Attach File (Optional)
-                        </label>
-                        <div
-                          onDragEnter={handleDrag}
-                          onDragLeave={handleDrag}
-                          onDragOver={handleDrag}
-                          onDrop={handleDrop}
-                          className={`relative border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-                            dragActive
-                              ? "border-[#A8BBA3] bg-[#A8BBA3]/5"
-                              : "border-neutral-200 dark:border-neutral-700 hover:border-[#A8BBA3]"
-                          }`}
-                        >
-                          {file ? (
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                <div className="p-2 bg-[#A8BBA3]/10 rounded-lg">
-                                  <FileText className="w-5 h-5 text-[#A8BBA3]" />
-                                </div>
-                                <div className="text-left">
-                                  <p className="text-sm font-medium text-neutral-900 dark:text-white truncate max-w-[200px]">
-                                    {file.name}
-                                  </p>
-                                  <p className="text-xs text-neutral-500">
-                                    {formatFileSize(file.size)}
-                                  </p>
-                                </div>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => setFile(null)}
-                                className="p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded"
-                              >
-                                <X className="w-4 h-4 text-neutral-500" />
-                              </button>
-                            </div>
-                          ) : (
-                            <>
-                              <Upload className="w-8 h-8 text-neutral-400 mx-auto mb-2" />
-                              <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                                Drag and drop a file here, or{" "}
-                                <label className="text-[#A8BBA3] cursor-pointer hover:underline">
-                                  browse
-                                  <input
-                                    type="file"
-                                    onChange={handleFileChange}
-                                    disabled={isLoading}
-                                    className="hidden"
-                                    accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp,.txt"
-                                  />
-                                </label>
-                              </p>
-                              <p className="text-xs text-neutral-400 mt-1">
-                                PDF, Word, Excel, Images up to 10MB
-                              </p>
-                            </>
+                      {/* Expiring Documents */}
+                      <div>
+                        <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-1.5 uppercase tracking-wide">
+                          Expiring Documents
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {DOCUMENT_TYPES_BY_CATEGORY.expiring.map(
+                            (docType) => {
+                              const Icon = TYPE_ICONS[docType];
+                              const isSelected = type === docType;
+                              return (
+                                <button
+                                  key={docType}
+                                  type="button"
+                                  onClick={() => setType(docType)}
+                                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all ${
+                                    isSelected
+                                      ? "bg-[#A8BBA3] text-white"
+                                      : "bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700"
+                                  }`}
+                                >
+                                  <Icon className="h-3.5 w-3.5" />
+                                  {docType}
+                                </button>
+                              );
+                            },
                           )}
                         </div>
                       </div>
-                    )}
 
-                    {mode === "automatic" && file && (
-                      <div className="p-3 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg flex items-center gap-3">
-                        <div className="p-2 bg-[#A8BBA3]/10 rounded-lg">
-                          <FileText className="w-4 h-4 text-[#A8BBA3]" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-neutral-900 dark:text-white truncate">
-                            {file.name}
-                          </p>
-                          <p className="text-xs text-neutral-500">
-                            {formatFileSize(file.size)} • Will be attached
-                          </p>
+                      {/* Identity Documents */}
+                      <div>
+                        <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-1.5 uppercase tracking-wide">
+                          Identity Documents
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {DOCUMENT_TYPES_BY_CATEGORY.identity.map(
+                            (docType) => {
+                              const Icon = TYPE_ICONS[docType];
+                              const isSelected = type === docType;
+                              return (
+                                <button
+                                  key={docType}
+                                  type="button"
+                                  onClick={() => setType(docType)}
+                                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all ${
+                                    isSelected
+                                      ? "bg-[#A8BBA3] text-white"
+                                      : "bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700"
+                                  }`}
+                                >
+                                  <Icon className="h-3.5 w-3.5" />
+                                  {docType}
+                                </button>
+                              );
+                            },
+                          )}
                         </div>
                       </div>
-                    )}
 
-                    <div className="flex gap-3 pt-4">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleClose}
-                        disabled={isLoading}
-                        className="flex-1"
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="submit"
-                        disabled={isLoading}
-                        className="flex-1"
-                      >
-                        {isLoading ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Saving...
-                          </>
-                        ) : (
-                          "Add Document"
-                        )}
-                      </Button>
+                      {/* Other */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {DOCUMENT_TYPES_BY_CATEGORY.other.map((docType) => {
+                          const Icon = TYPE_ICONS[docType];
+                          const isSelected = type === docType;
+                          return (
+                            <button
+                              key={docType}
+                              type="button"
+                              onClick={() => setType(docType)}
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all ${
+                                isSelected
+                                  ? "bg-[#A8BBA3] text-white"
+                                  : "bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700"
+                              }`}
+                            >
+                              <Icon className="h-3.5 w-3.5" />
+                              {docType}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </form>
-                )}
-              </div>
+                  </div>
+
+                  {/* Title */}
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+                      Title *
+                    </label>
+                    <Input
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder={`e.g., My ${type}`}
+                      className="h-10"
+                    />
+                  </div>
+
+                  {/* Document Number (for identity docs) */}
+                  {config.hasDocumentNumber && (
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+                        <Hash className="h-3.5 w-3.5 inline mr-1" />
+                        Document Number
+                      </label>
+                      <Input
+                        value={documentNumber}
+                        onChange={(e) => setDocumentNumber(e.target.value)}
+                        placeholder="e.g., ABC123456"
+                        className="h-10"
+                      />
+                    </div>
+                  )}
+
+                  {/* Dates Row */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {config.hasDocumentNumber && (
+                      <div>
+                        <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+                          <Calendar className="h-3.5 w-3.5 inline mr-1" />
+                          Issue Date
+                        </label>
+                        <Input
+                          type="date"
+                          value={issueDate}
+                          onChange={(e) => setIssueDate(e.target.value)}
+                          className="h-10"
+                        />
+                      </div>
+                    )}
+                    <div
+                      className={config.hasDocumentNumber ? "" : "col-span-2"}
+                    >
+                      <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+                        <Calendar className="h-3.5 w-3.5 inline mr-1" />
+                        {config.hasExpiry
+                          ? "Expiration Date *"
+                          : "Expiration Date"}
+                      </label>
+                      <Input
+                        type="date"
+                        value={expirationDate}
+                        onChange={(e) => setExpirationDate(e.target.value)}
+                        className="h-10"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Issuing Authority (for identity docs) */}
+                  {config.hasDocumentNumber && (
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+                        <Building className="h-3.5 w-3.5 inline mr-1" />
+                        Issuing Authority
+                      </label>
+                      <Input
+                        value={issuingAuthority}
+                        onChange={(e) => setIssuingAuthority(e.target.value)}
+                        placeholder="e.g., Government of Nepal"
+                        className="h-10"
+                      />
+                    </div>
+                  )}
+
+                  {/* Reminder Date */}
+                  {config.hasExpiry && (
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+                        <Calendar className="h-3.5 w-3.5 inline mr-1" />
+                        Reminder Date
+                      </label>
+                      <Input
+                        type="date"
+                        value={reminderDate}
+                        onChange={(e) => setReminderDate(e.target.value)}
+                        className="h-10"
+                      />
+                    </div>
+                  )}
+
+                  {/* Notes */}
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+                      Notes
+                    </label>
+                    <textarea
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      placeholder="Additional details..."
+                      rows={2}
+                      className="w-full px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[#A8BBA3] resize-none text-sm"
+                    />
+                  </div>
+
+                  {/* File Upload (for manual mode or to change file) */}
+                  {(mode === "manual" || !file) && (
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+                        <Upload className="h-3.5 w-3.5 inline mr-1" />
+                        Attachment
+                      </label>
+                      <div
+                        onDragEnter={handleDrag}
+                        onDragLeave={handleDrag}
+                        onDragOver={handleDrag}
+                        onDrop={handleDrop}
+                        className={`relative border-2 border-dashed rounded-xl p-4 text-center transition-all ${
+                          dragActive
+                            ? "border-[#A8BBA3] bg-[#A8BBA3]/5"
+                            : file
+                              ? "border-green-500 bg-green-50 dark:bg-green-900/10"
+                              : "border-neutral-300 dark:border-neutral-700"
+                        }`}
+                      >
+                        <input
+                          type="file"
+                          onChange={handleFileChange}
+                          accept="image/*,.pdf"
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        />
+                        {file ? (
+                          <div className="flex items-center justify-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            <span className="text-sm text-neutral-700 dark:text-neutral-300">
+                              {file.name}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setFile(null);
+                              }}
+                              className="p-1 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded"
+                            >
+                              <X className="h-3.5 w-3.5 text-neutral-500" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center gap-2 text-neutral-500">
+                            <Upload className="h-4 w-4" />
+                            <span className="text-sm">
+                              Drop file or click to upload
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Show attached file info in review mode */}
+                  {mode === "automatic" &&
+                    automaticStep === "review" &&
+                    file && (
+                      <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/10 rounded-lg text-sm">
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <span className="text-neutral-700 dark:text-neutral-300">
+                          {file.name}
+                        </span>
+                      </div>
+                    )}
+                </div>
+              )}
             </div>
+
+            {/* Footer */}
+            {(mode === "manual" ||
+              (mode === "automatic" && automaticStep === "review")) && (
+              <div className="flex justify-end gap-3 p-5 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50">
+                <Button variant="outline" onClick={handleClose}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSubmit}
+                  disabled={isLoading}
+                  className="bg-[#A8BBA3] hover:bg-[#96ab91] text-white min-w-[100px]"
+                >
+                  {isLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "Save Document"
+                  )}
+                </Button>
+              </div>
+            )}
           </motion.div>
-        </>
+        </div>
       )}
     </AnimatePresence>
   );

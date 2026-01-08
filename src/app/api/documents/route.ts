@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import type { DocumentType } from "@/lib/supabase";
+import { DOCUMENT_TYPE_CONFIG } from "@/lib/supabase";
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,17 +21,29 @@ export async function POST(req: NextRequest) {
 
     const title = formData.get("title") as string;
     const type = formData.get("type") as DocumentType;
-    const expirationDate = formData.get("expiration_date") as string;
+    const expirationDate = formData.get("expiration_date") as string | null;
     const reminderDate = formData.get("reminder_date") as string | null;
     const notes = formData.get("notes") as string | null;
     const file = formData.get("file") as File | null;
+    const documentNumber = formData.get("document_number") as string | null;
+    const issueDate = formData.get("issue_date") as string | null;
+    const issuingAuthority = formData.get("issuing_authority") as string | null;
 
-    if (!title || !type || !expirationDate) {
+    if (!title || !type) {
       return NextResponse.json(
-        {
-          error:
-            "Missing required fields: title, type, and expiration_date are required",
-        },
+        { error: "Missing required fields: title and type are required" },
+        { status: 400 },
+      );
+    }
+
+    // Get the category from the document type config
+    const typeConfig = DOCUMENT_TYPE_CONFIG[type];
+    const category = typeConfig?.category || "other";
+
+    // Check if expiration date is required for this document type
+    if (typeConfig?.hasExpiry && !expirationDate) {
+      return NextResponse.json(
+        { error: "Expiration date is required for this document type" },
         { status: 400 },
       );
     }
@@ -67,13 +80,17 @@ export async function POST(req: NextRequest) {
       .insert({
         title: title.trim(),
         type,
-        expiration_date: expirationDate,
+        category,
+        expiration_date: expirationDate || null,
         reminder_date: reminderDate || null,
         notes: notes?.trim() || null,
         file_path: filePath,
         file_name: fileName,
         file_type: fileType,
         file_size: fileSize,
+        document_number: documentNumber?.trim() || null,
+        issue_date: issueDate || null,
+        issuing_authority: issuingAuthority?.trim() || null,
         user_id: userId,
       })
       .select()

@@ -1,39 +1,60 @@
 "use client";
 
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
   FileText,
   Calendar,
   Clock,
-  Tag,
-  StickyNote,
   Download,
-  ExternalLink,
   CheckCircle,
   AlertCircle,
+  Shield,
+  Hash,
+  Building,
+  Home,
+  CreditCard,
+  Car,
+  ScrollText,
+  Vote,
+  Bookmark,
+  FileCheck,
+  Package,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { Document } from "@/lib/supabase";
+import type { Document, DocumentType, DocumentStatus } from "@/lib/supabase";
+import { DOCUMENT_TYPE_CONFIG } from "@/lib/supabase";
 import {
   getDocumentStatus,
   getDaysUntilExpiration,
   getFileDownloadUrl,
 } from "@/lib/document-actions";
-import { useState } from "react";
 
 interface ViewDocumentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onEdit: () => void;
   document: Document | null;
 }
 
-function StatusBadge({
-  status,
-}: {
-  status: "valid" | "expiring_soon" | "expired";
-}) {
+const TYPE_ICONS: Record<DocumentType, React.ElementType> = {
+  "Rent Agreement": Home,
+  Insurance: Shield,
+  Subscription: Bookmark,
+  License: FileCheck,
+  Warranty: Package,
+  Contract: ScrollText,
+  Citizenship: FileText,
+  "PAN Card": CreditCard,
+  "National ID": CreditCard,
+  Passport: FileText,
+  "Driving License": Car,
+  "Voter ID": Vote,
+  "Birth Certificate": ScrollText,
+  Other: FileText,
+};
+
+function StatusBadge({ status }: { status: DocumentStatus }) {
   const config = {
     valid: {
       icon: CheckCircle,
@@ -52,13 +73,20 @@ function StatusBadge({
       text: "Expired",
       className: "bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400",
     },
+    no_expiry: {
+      icon: Shield,
+      text: "Permanent",
+      className:
+        "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400",
+    },
   };
 
-  const { icon: Icon, text, className } = config[status];
+  const statusConfig = config[status] || config.valid;
+  const { icon: Icon, text, className } = statusConfig;
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${className}`}
+      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${className}`}
     >
       <Icon className="h-4 w-4" />
       {text}
@@ -66,17 +94,19 @@ function StatusBadge({
   );
 }
 
-function formatDate(dateString: string): string {
+function formatDate(dateString: string | null | undefined): string {
+  if (!dateString) return "Not set";
   const date = new Date(dateString);
   return date.toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
+    weekday: "short",
+    month: "short",
     day: "numeric",
     year: "numeric",
   });
 }
 
-function formatFileSize(bytes: number): string {
+function formatFileSize(bytes: number | null | undefined): string {
+  if (!bytes) return "";
   if (bytes < 1024) return bytes + " B";
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
   return (bytes / (1024 * 1024)).toFixed(1) + " MB";
@@ -85,19 +115,16 @@ function formatFileSize(bytes: number): string {
 export function ViewDocumentModal({
   isOpen,
   onClose,
-  onEdit,
   document,
 }: ViewDocumentModalProps) {
   const [isDownloading, setIsDownloading] = useState(false);
 
-  if (!document) return null;
+  if (!isOpen || !document) return null;
 
-  const status = document.expiration_date
-    ? getDocumentStatus(document.expiration_date)
-    : "valid";
-  const daysUntil = document.expiration_date
-    ? getDaysUntilExpiration(document.expiration_date)
-    : null;
+  const status = getDocumentStatus(document.expiration_date);
+  const daysUntil = getDaysUntilExpiration(document.expiration_date);
+  const config = DOCUMENT_TYPE_CONFIG[document.type as DocumentType];
+  const TypeIcon = TYPE_ICONS[document.type as DocumentType] || FileText;
 
   const handleDownload = async () => {
     if (!document.file_path) return;
@@ -108,219 +135,227 @@ export function ViewDocumentModal({
       window.open(downloadUrl, "_blank");
     } catch (error) {
       console.error("Error downloading file:", error);
-      alert("Failed to download file. Please try again.");
     } finally {
       setIsDownloading(false);
     }
   };
 
-  const getTypeColor = (type: string) => {
-    const colors: Record<string, string> = {
-      Rent: "bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400",
-      Insurance:
-        "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400",
-      Subscription:
-        "bg-pink-50 text-pink-700 dark:bg-pink-900/20 dark:text-pink-400",
-      License:
-        "bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400",
-      Other:
-        "bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-400",
-    };
-    return colors[type] || colors.Other;
-  };
-
   return (
     <AnimatePresence>
       {isOpen && (
-        <>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
           />
 
+          {/* Modal */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-lg max-h-[90vh] overflow-y-auto"
+            transition={{ duration: 0.2 }}
+            className="relative w-full max-w-md bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl overflow-hidden"
           >
-            <div className="bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl border border-neutral-200 dark:border-neutral-800">
-              <div className="flex items-center justify-between p-6 border-b border-neutral-200 dark:border-neutral-800">
+            {/* Header */}
+            <div
+              className={`p-5 ${config?.bgColor || "bg-neutral-100 dark:bg-neutral-800"}`}
+            >
+              <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-[#A8BBA3]/10 rounded-lg">
-                    <FileText className="w-5 h-5 text-[#A8BBA3]" />
+                  <div className="p-2.5 rounded-xl bg-white/60 dark:bg-neutral-800/60">
+                    <TypeIcon
+                      className={`h-6 w-6 ${config?.color || "text-neutral-600"}`}
+                    />
                   </div>
-                  <h2 className="text-xl font-semibold text-neutral-900 dark:text-white">
-                    Document Details
-                  </h2>
+                  <div>
+                    <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">
+                      {document.title}
+                    </h2>
+                    <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                      {document.type}
+                    </p>
+                  </div>
                 </div>
                 <button
                   onClick={onClose}
-                  className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg transition-colors"
+                  className="p-2 rounded-lg hover:bg-white/50 dark:hover:bg-neutral-800/50 transition-colors"
                 >
-                  <X className="w-5 h-5 text-neutral-500" />
+                  <X className="h-5 w-5 text-neutral-600 dark:text-neutral-400" />
                 </button>
               </div>
 
-              <div className="p-6 space-y-6">
-                <div className="space-y-3">
-                  <h3 className="text-2xl font-bold text-neutral-900 dark:text-white">
-                    {document.title}
-                  </h3>
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <StatusBadge status={status} />
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${getTypeColor(document.type)}`}
-                    >
-                      <Tag className="h-3.5 w-3.5" />
-                      {document.type}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="p-4 rounded-xl bg-neutral-50 dark:bg-neutral-800/50 space-y-4">
-                  <div className="flex items-start gap-3">
-                    <div className="p-2 bg-white dark:bg-neutral-800 rounded-lg shadow-sm">
-                      <Calendar className="w-4 h-4 text-neutral-500" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                        Expiration Date
-                      </p>
-                      <p className="font-medium text-neutral-900 dark:text-white">
-                        {document.expiration_date
-                          ? formatDate(document.expiration_date)
-                          : "Not set"}
-                      </p>
-                      {daysUntil !== null && (
-                        <p
-                          className={`text-sm mt-1 ${
-                            daysUntil < 0
-                              ? "text-red-500"
-                              : daysUntil <= 30
-                                ? "text-orange-500"
-                                : "text-green-500"
-                          }`}
-                        >
-                          {daysUntil < 0
-                            ? `Expired ${Math.abs(daysUntil)} days ago`
-                            : daysUntil === 0
-                              ? "Expires today"
-                              : `Expires in ${daysUntil} days`}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {document.reminder_date && (
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 bg-white dark:bg-neutral-800 rounded-lg shadow-sm">
-                        <Clock className="w-4 h-4 text-neutral-500" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                          Reminder Date
-                        </p>
-                        <p className="font-medium text-neutral-900 dark:text-white">
-                          {formatDate(document.reminder_date)}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {document.notes && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-neutral-500 dark:text-neutral-400">
-                      <StickyNote className="w-4 h-4" />
-                      <span className="text-sm font-medium">Notes</span>
-                    </div>
-                    <p className="text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap bg-neutral-50 dark:bg-neutral-800/50 rounded-lg p-4">
-                      {document.notes}
-                    </p>
-                  </div>
+              <div className="flex items-center gap-3 mt-4">
+                <StatusBadge status={status} />
+                {daysUntil !== null && (
+                  <span
+                    className={`text-sm font-medium ${
+                      daysUntil < 0
+                        ? "text-red-600 dark:text-red-400"
+                        : daysUntil <= 30
+                          ? "text-orange-600 dark:text-orange-400"
+                          : "text-neutral-600 dark:text-neutral-400"
+                    }`}
+                  >
+                    {daysUntil < 0
+                      ? `${Math.abs(daysUntil)} days overdue`
+                      : `${daysUntil} days left`}
+                  </span>
                 )}
-
-                {document.file_name && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-neutral-500 dark:text-neutral-400">
-                      <FileText className="w-4 h-4" />
-                      <span className="text-sm font-medium">Attached File</span>
-                    </div>
-                    <div className="flex items-center justify-between p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-[#A8BBA3]/10 rounded-lg">
-                          <FileText className="w-5 h-5 text-[#A8BBA3]" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-neutral-900 dark:text-white truncate max-w-[200px]">
-                            {document.file_name}
-                          </p>
-                          <p className="text-xs text-neutral-500">
-                            {document.file_size
-                              ? formatFileSize(document.file_size)
-                              : "Unknown size"}
-                            {document.file_type && ` • ${document.file_type}`}
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleDownload}
-                        disabled={isDownloading}
-                        className="gap-2"
-                      >
-                        {isDownloading ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current" />
-                        ) : (
-                          <Download className="w-4 h-4" />
-                        )}
-                        Download
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                <div className="pt-4 border-t border-neutral-200 dark:border-neutral-800">
-                  <div className="flex items-center justify-between text-xs text-neutral-400">
-                    <span>
-                      Created:{" "}
-                      {document.created_at
-                        ? new Date(document.created_at).toLocaleDateString()
-                        : "Unknown"}
-                    </span>
-                    <span>
-                      Updated:{" "}
-                      {document.updated_at
-                        ? new Date(document.updated_at).toLocaleDateString()
-                        : "Unknown"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-3 p-6 pt-0">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={onClose}
-                  className="flex-1"
-                >
-                  Close
-                </Button>
-                <Button type="button" onClick={onEdit} className="flex-1 gap-2">
-                  <ExternalLink className="w-4 h-4" />
-                  Edit Document
-                </Button>
               </div>
             </div>
+
+            {/* Content */}
+            <div className="p-5 space-y-4">
+              {/* Document Number */}
+              {document.document_number && (
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-neutral-100 dark:bg-neutral-800">
+                    <Hash className="h-4 w-4 text-neutral-500" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-neutral-500">Document Number</p>
+                    <p className="font-medium text-neutral-900 dark:text-white">
+                      {document.document_number}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Issue Date */}
+              {document.issue_date && (
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-neutral-100 dark:bg-neutral-800">
+                    <Calendar className="h-4 w-4 text-neutral-500" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-neutral-500">Issue Date</p>
+                    <p className="font-medium text-neutral-900 dark:text-white">
+                      {formatDate(document.issue_date)}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Expiration Date */}
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-neutral-100 dark:bg-neutral-800">
+                  <Calendar className="h-4 w-4 text-neutral-500" />
+                </div>
+                <div>
+                  <p className="text-xs text-neutral-500">Expiration Date</p>
+                  <p className="font-medium text-neutral-900 dark:text-white">
+                    {document.expiration_date
+                      ? formatDate(document.expiration_date)
+                      : "No expiration"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Issuing Authority */}
+              {document.issuing_authority && (
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-neutral-100 dark:bg-neutral-800">
+                    <Building className="h-4 w-4 text-neutral-500" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-neutral-500">
+                      Issuing Authority
+                    </p>
+                    <p className="font-medium text-neutral-900 dark:text-white">
+                      {document.issuing_authority}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Reminder Date */}
+              {document.reminder_date && (
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-neutral-100 dark:bg-neutral-800">
+                    <Clock className="h-4 w-4 text-neutral-500" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-neutral-500">Reminder Date</p>
+                    <p className="font-medium text-neutral-900 dark:text-white">
+                      {formatDate(document.reminder_date)}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Notes */}
+              {document.notes && (
+                <div className="pt-2">
+                  <p className="text-xs text-neutral-500 mb-1">Notes</p>
+                  <p className="text-sm text-neutral-700 dark:text-neutral-300 bg-neutral-50 dark:bg-neutral-800 rounded-lg p-3">
+                    {document.notes}
+                  </p>
+                </div>
+              )}
+
+              {/* Attached File */}
+              {document.file_name && (
+                <div className="pt-2">
+                  <p className="text-xs text-neutral-500 mb-2">Attachment</p>
+                  <div className="flex items-center justify-between p-3 bg-neutral-50 dark:bg-neutral-800 rounded-lg">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <FileText className="h-5 w-5 text-[#A8BBA3] shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-neutral-900 dark:text-white truncate">
+                          {document.file_name}
+                        </p>
+                        <p className="text-xs text-neutral-500">
+                          {formatFileSize(document.file_size)}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleDownload}
+                      disabled={isDownloading}
+                      className="shrink-0"
+                    >
+                      {isDownloading ? (
+                        <span className="h-4 w-4 border-2 border-neutral-300 border-t-neutral-600 rounded-full animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Metadata */}
+              <div className="pt-3 border-t border-neutral-200 dark:border-neutral-800 flex items-center justify-between text-xs text-neutral-400">
+                <span>
+                  Created:{" "}
+                  {document.created_at
+                    ? new Date(document.created_at).toLocaleDateString()
+                    : "Unknown"}
+                </span>
+                <span>
+                  Updated:{" "}
+                  {document.updated_at
+                    ? new Date(document.updated_at).toLocaleDateString()
+                    : "Unknown"}
+                </span>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-5 pt-0">
+              <Button variant="outline" onClick={onClose} className="w-full">
+                Close
+              </Button>
+            </div>
           </motion.div>
-        </>
+        </div>
       )}
     </AnimatePresence>
   );

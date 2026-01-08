@@ -35,6 +35,25 @@ export const loginUser = async (email: string, password: string) => {
   return data;
 };
 
+export const signInWithGoogle = async () => {
+  const { data, error } = await supabaseBrowser.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: `${window.location.origin}/dashboard`,
+      queryParams: {
+        access_type: "offline",
+        prompt: "consent",
+      },
+    },
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+};
+
 export const checkAuth = async () => {
   const {
     data: { user },
