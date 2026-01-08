@@ -44,6 +44,7 @@ import {
 } from "@/lib/document-actions";
 import { DOCUMENT_TYPE_CONFIG } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
+import { useToast } from "@/components/ui/toast";
 
 const TYPE_ICONS: Record<DocumentType, React.ElementType> = {
   "Rent Agreement": Home,
@@ -116,6 +117,7 @@ function formatDate(dateString: string | null | undefined): string {
 export default function RemindersPage() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { addToast } = useToast();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [refresh, setRefresh] = useState(false);
   const [filter, setFilter] = useState<"all" | "expired" | "expiring_soon">(
@@ -229,7 +231,11 @@ export default function RemindersPage() {
 
   const handleDownload = async (document: Document) => {
     if (!document.file_path) {
-      alert("No file attached to this document");
+      addToast({
+        type: "warning",
+        title: "No File Available",
+        message: "This document does not have an attached file to download.",
+      });
       return;
     }
 
@@ -237,9 +243,19 @@ export default function RemindersPage() {
       setOpenMenuId(null);
       const downloadUrl = await getFileDownloadUrl(document.file_path);
       window.open(downloadUrl, "_blank");
+      addToast({
+        type: "success",
+        title: "Download Started",
+        message: "Your document download has been initiated successfully.",
+      });
     } catch (error) {
       console.error("Error downloading file:", error);
-      alert("Failed to download file");
+      addToast({
+        type: "error",
+        title: "Download Failed",
+        message:
+          "Unable to download the file. Please try again or contact support.",
+      });
     }
   };
 

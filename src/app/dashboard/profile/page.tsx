@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { useState, useEffect, useCallback, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   User,
   Settings,
@@ -22,7 +23,7 @@ import {
   Building2,
   CreditCard,
   Globe,
-  Smartphone,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,6 +37,7 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
 import { useAuth } from "@/hooks/useAuth";
@@ -64,24 +66,41 @@ interface GooglePasswordSetup {
   confirmPassword: string;
 }
 
-export default function ProfilePage() {
-  const { user, loading } = useAuth();
-  const [activeTab, setActiveTab] = useState("profile");
+function ProfilePageContent() {
+  const { user, loading, refreshUser } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabFromUrl = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState(tabFromUrl || "profile");
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    if (
+      tabFromUrl &&
+      ["profile", "security", "settings"].includes(tabFromUrl)
+    ) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [tabFromUrl]);
+
   const [isSaving, setIsSaving] = useState(false);
 
-  // Password Management
   const [showPasswords, setShowPasswords] = useState({
     current: false,
     new: false,
     confirm: false,
   });
+
   const [passwordData, setPasswordData] = useState<PasswordChangeData>({
     currentPassword: "",
     newPassword: "",
     confirmPassword: "",
   });
+
   const [googlePasswordData, setGooglePasswordData] =
     useState<GooglePasswordSetup>({
       confirmEmail: "",
@@ -89,53 +108,160 @@ export default function ProfilePage() {
       confirmPassword: "",
     });
 
-  // 2FA
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [verificationCode, setVerificationCode] = useState("");
   const [backupCodes, setBackupCodes] = useState<string[]>([]);
 
-  // Messages
+  const [emailNotifications, setEmailNotifications] = useState(true);
+  const [desktopNotifications, setDesktopNotifications] = useState(false);
+
   const [message, setMessage] = useState<{
     type: "success" | "error";
     text: string;
   } | null>(null);
 
-  useEffect(() => {
-    if (user) {
-      fetchProfileData();
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== "DELETE") {
+      setMessage({ type: "error", text: "Please type DELETE to confirm" });
+      return;
     }
-  }, [user]);
-
-  const fetchProfileData = async () => {
-    if (!user) return;
 
     try {
-      setIsLoading(true);
+      setIsDeleting(true);
 
-      // Get user metadata and check if OAuth
-      const isOAuth = user.app_metadata?.provider === "google";
-      const hasPassword = !isOAuth || user.user_metadata?.has_custom_password;
+      const { data: documents } = await supabase
+        .from("documents")
+        .select("file_path")
+        .eq("user_id", user?.id);
+
+      if (documents && documents.length > 0) {
+        const filePaths = documents.map((doc) => doc.file_path).filter(Boolean);
+        if (filePaths.length > 0) {
+          await supabase.storage.from("documents").remove(filePaths);
+        }
+      }
+
+      await supabase.from("documents").delete().eq("user_id", user?.id);
+
+      if (profileData?.avatar_url) {
+        const avatarPath = profileData.avatar_url.split("/").pop();
+        if (avatarPath) {
+          await supabase.storage
+            .from("avatars")
+            .remove([`${user?.id}/${avatarPath}`]);
+        }
+      }
+
+      await supabase.auth.signOut();
+      router.push("/?deleted=true");
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      setMessage({
+        type: "error",
+        text: "Failed to delete account. Please try again.",
+      });
+      setIsDeleting(false);
+    }
+  };
+
+  const fetchProfileData = useCallback(async () => {
+    if (!user) {
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const identities = user.identities || [];
+      const hasGoogleIdentity = identities.some(
+        (identity: { provider?: string }) => identity.provider === "google",
+      );
+      const isOAuth: boolean =
+        user.app_metadata?.provider === "google" ||
+        user.app_metadata?.providers?.includes("google") ||
+        hasGoogleIdentity ||
+        false;
+
+      const hasPassword: boolean =
+        !isOAuth || !!user.user_metadata?.has_custom_password;
+
+      const avatarUrl =
+        user.user_metadata?.avatar_url ||
+        user.user_metadata?.picture ||
+        user.user_metadata?.avatar ||
+        identities.find(
+          (i: {
+            provider?: string;
+            identity_data?: { avatar_url?: string; picture?: string };
+          }) => i.provider === "google",
+        )?.identity_data?.avatar_url ||
+        identities.find(
+          (i: {
+            provider?: string;
+            identity_data?: { avatar_url?: string; picture?: string };
+          }) => i.provider === "google",
+        )?.identity_data?.picture ||
+        null;
+
+      const displayName =
+        user.user_metadata?.name ||
+        user.user_metadata?.full_name ||
+        user.user_metadata?.user_name ||
+        identities.find(
+          (i: {
+            provider?: string;
+            identity_data?: { name?: string; full_name?: string };
+          }) => i.provider === "google",
+        )?.identity_data?.name ||
+        identities.find(
+          (i: {
+            provider?: string;
+            identity_data?: { name?: string; full_name?: string };
+          }) => i.provider === "google",
+        )?.identity_data?.full_name ||
+        user.email?.split("@")[0] ||
+        "";
+
+      const registrationDate = user.created_at || "";
 
       setProfileData({
         email: user.email || "",
-        name: user.user_metadata?.name || user.email?.split("@")[0] || "",
-        avatar_url: user.user_metadata?.avatar_url || null,
+        name: displayName,
+        avatar_url: avatarUrl,
         phone: user.user_metadata?.phone || null,
-        created_at: user.created_at,
+        created_at: registrationDate || user.created_at || "",
         is_oauth: isOAuth,
         has_password: hasPassword,
         two_factor_enabled: user.user_metadata?.two_factor_enabled || false,
       });
 
       setTwoFactorEnabled(user.user_metadata?.two_factor_enabled || false);
+      setEmailNotifications(user.user_metadata?.email_notifications !== false);
+      setDesktopNotifications(
+        user.user_metadata?.desktop_notifications || false,
+      );
     } catch (error) {
       console.error("Error fetching profile:", error);
       setMessage({ type: "error", text: "Failed to load profile data" });
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (!loading && user) {
+      fetchProfileData();
+    } else if (!loading && !user) {
+      refreshUser().then((freshUser) => {
+        if (freshUser) {
+          fetchProfileData();
+        } else {
+          setIsLoading(false);
+        }
+      });
+    }
+  }, [loading, user, fetchProfileData, refreshUser]);
 
   const handleProfileUpdate = async (field: string, value: string) => {
     if (!user) return;
@@ -177,7 +303,6 @@ export default function ProfilePage() {
       setIsSaving(true);
 
       if (!profileData.is_oauth) {
-        // For email/password users, verify current password first
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email: user.email!,
           password: passwordData.currentPassword,
@@ -188,14 +313,12 @@ export default function ProfilePage() {
         }
       }
 
-      // Update password
       const { error } = await supabase.auth.updateUser({
         password: passwordData.newPassword,
       });
 
       if (error) throw error;
 
-      // Update user metadata to indicate they now have a custom password
       if (profileData.is_oauth) {
         await supabase.auth.updateUser({
           data: { has_custom_password: true },
@@ -243,7 +366,6 @@ export default function ProfilePage() {
     try {
       setIsSaving(true);
 
-      // Set password for OAuth user
       const { error } = await supabase.auth.updateUser({
         password: googlePasswordData.newPassword,
         data: { has_custom_password: true },
@@ -270,11 +392,8 @@ export default function ProfilePage() {
 
   const handleTwoFactorToggle = async () => {
     if (!twoFactorEnabled) {
-      // Enable 2FA - generate QR code
       try {
         setIsSaving(true);
-        // This would typically call your backend to generate TOTP secret and QR code
-        // For demo purposes, we'll simulate this
         setQrCode(
           "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
         );
@@ -288,7 +407,6 @@ export default function ProfilePage() {
         setIsSaving(false);
       }
     } else {
-      // Disable 2FA
       try {
         setIsSaving(true);
         await supabase.auth.updateUser({
@@ -313,8 +431,6 @@ export default function ProfilePage() {
 
     try {
       setIsSaving(true);
-      // Verify the code with your backend
-      // For demo purposes, we'll simulate this
       if (verificationCode === "123456") {
         await supabase.auth.updateUser({
           data: { two_factor_enabled: true },
@@ -346,7 +462,6 @@ export default function ProfilePage() {
     try {
       setIsSaving(true);
 
-      // Upload to Supabase storage
       const fileExt = file.name.split(".").pop();
       const fileName = `${user?.id}-${Math.random()}.${fileExt}`;
 
@@ -356,12 +471,10 @@ export default function ProfilePage() {
 
       if (error) throw error;
 
-      // Get public URL
       const {
         data: { publicUrl },
       } = supabase.storage.from("avatars").getPublicUrl(fileName);
 
-      // Update user metadata
       await handleProfileUpdate("avatar_url", publicUrl);
     } catch (error: any) {
       setMessage({ type: "error", text: error.message });
@@ -392,7 +505,6 @@ export default function ProfilePage() {
         <Header user={user} />
 
         <main className="p-4 md:p-6 lg:p-8 max-w-4xl mx-auto">
-          {/* Page Header */}
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-3">
               <div className="p-2.5 rounded-xl bg-[#A8BBA3]/10 dark:bg-[#A8BBA3]/20">
@@ -410,7 +522,6 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* Message */}
           {message && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
@@ -439,7 +550,6 @@ export default function ProfilePage() {
               <TabsTrigger value="settings">Settings</TabsTrigger>
             </TabsList>
 
-            {/* Profile Tab */}
             <TabsContent value="profile" className="space-y-6">
               <Card>
                 <CardHeader>
@@ -454,7 +564,6 @@ export default function ProfilePage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* Avatar */}
                   <div className="flex items-center gap-6">
                     <div className="relative">
                       {profileData?.avatar_url ? (
@@ -462,6 +571,7 @@ export default function ProfilePage() {
                           src={profileData.avatar_url}
                           alt="Profile"
                           className="h-20 w-20 rounded-full object-cover"
+                          referrerPolicy="no-referrer"
                         />
                       ) : (
                         <div className="h-20 w-20 rounded-full bg-gradient-to-tr from-[#A8BBA3] to-[#8FA58F] flex items-center justify-center text-white text-xl font-bold">
@@ -489,7 +599,6 @@ export default function ProfilePage() {
                     </div>
                   </div>
 
-                  {/* Name */}
                   <div className="space-y-2">
                     <Label htmlFor="name">Display Name</Label>
                     <Input
@@ -498,11 +607,10 @@ export default function ProfilePage() {
                       onChange={(e) =>
                         handleProfileUpdate("name", e.target.value)
                       }
-                      placeholder="Enter your display name"
+                      placeholder="Enter your full name"
                     />
                   </div>
 
-                  {/* Email */}
                   <div className="space-y-2">
                     <Label htmlFor="email">Email Address</Label>
                     <div className="flex items-center gap-2">
@@ -523,7 +631,6 @@ export default function ProfilePage() {
                     </p>
                   </div>
 
-                  {/* Account Info */}
                   <div className="grid grid-cols-2 gap-4 p-4 bg-gradient-to-r from-neutral-50 to-neutral-100 dark:from-neutral-800/30 dark:to-neutral-800/50 rounded-lg border border-neutral-200/50 dark:border-neutral-700/50">
                     <div className="flex items-center gap-2">
                       <Globe className="h-4 w-4 text-neutral-500" />
@@ -548,8 +655,21 @@ export default function ProfilePage() {
                           {profileData?.created_at
                             ? new Date(
                                 profileData.created_at,
-                              ).toLocaleDateString()
-                            : "Unknown"}
+                              ).toLocaleDateString("en-US", {
+                                year: "numeric",
+                                month: "long",
+                                day: "numeric",
+                              })
+                            : user?.created_at
+                              ? new Date(user.created_at).toLocaleDateString(
+                                  "en-US",
+                                  {
+                                    year: "numeric",
+                                    month: "long",
+                                    day: "numeric",
+                                  },
+                                )
+                              : "Unknown"}
                         </p>
                       </div>
                     </div>
@@ -558,9 +678,7 @@ export default function ProfilePage() {
               </Card>
             </TabsContent>
 
-            {/* Security Tab */}
             <TabsContent value="security" className="space-y-6">
-              {/* Password Management */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-3">
@@ -577,7 +695,6 @@ export default function ProfilePage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {profileData?.is_oauth && !profileData?.has_password ? (
-                    // Google OAuth user without password
                     <div className="space-y-4">
                       <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                         <div className="flex items-center gap-2 mb-2">
@@ -699,7 +816,6 @@ export default function ProfilePage() {
                       </Button>
                     </div>
                   ) : (
-                    // Regular password change
                     <div className="space-y-4">
                       {!profileData?.is_oauth && (
                         <div className="space-y-2">
@@ -830,7 +946,6 @@ export default function ProfilePage() {
                 </CardContent>
               </Card>
 
-              {/* Two-Factor Authentication */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-3">
@@ -855,12 +970,10 @@ export default function ProfilePage() {
                           : "Strengthen account security with 2FA"}
                       </p>
                     </div>
-                    <input
-                      type="checkbox"
+                    <Switch
                       checked={twoFactorEnabled}
-                      onChange={handleTwoFactorToggle}
+                      onCheckedChange={handleTwoFactorToggle}
                       disabled={isSaving}
-                      className="w-10 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"
                     />
                   </div>
 
@@ -928,7 +1041,6 @@ export default function ProfilePage() {
               </Card>
             </TabsContent>
 
-            {/* Settings Tab */}
             <TabsContent value="settings" className="space-y-6">
               <Card>
                 <CardHeader>
@@ -949,14 +1061,17 @@ export default function ProfilePage() {
                         Email Notifications
                       </p>
                       <p className="text-sm text-neutral-500">
-                        Receive professional alerts for document expiration
-                        dates
+                        Receive alerts for document expiration dates
                       </p>
                     </div>
-                    <input
-                      type="checkbox"
-                      defaultChecked
-                      className="w-10 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"
+                    <Switch
+                      checked={emailNotifications}
+                      onCheckedChange={async (checked) => {
+                        setEmailNotifications(checked);
+                        await supabase.auth.updateUser({
+                          data: { email_notifications: checked },
+                        });
+                      }}
                     />
                   </div>
 
@@ -966,28 +1081,28 @@ export default function ProfilePage() {
                         Desktop Notifications
                       </p>
                       <p className="text-sm text-neutral-500">
-                        Display system notifications for important updates
+                        Display browser notifications for important updates
                       </p>
                     </div>
-                    <input
-                      type="checkbox"
-                      className="w-10 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-neutral-900 dark:text-white">
-                        Data Synchronization
-                      </p>
-                      <p className="text-sm text-neutral-500">
-                        Maintain data consistency across all devices
-                      </p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      defaultChecked
-                      className="w-10 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"
+                    <Switch
+                      checked={desktopNotifications}
+                      onCheckedChange={async (checked) => {
+                        if (checked && "Notification" in window) {
+                          const permission =
+                            await Notification.requestPermission();
+                          if (permission === "granted") {
+                            setDesktopNotifications(true);
+                            await supabase.auth.updateUser({
+                              data: { desktop_notifications: true },
+                            });
+                          }
+                        } else {
+                          setDesktopNotifications(false);
+                          await supabase.auth.updateUser({
+                            data: { desktop_notifications: false },
+                          });
+                        }
+                      }}
                     />
                   </div>
                 </CardContent>
@@ -1007,7 +1122,12 @@ export default function ProfilePage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Button variant="destructive" size="sm">
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setShowDeleteModal(true)}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
                     Permanently Delete Account
                   </Button>
                   <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/10 rounded-lg border border-red-200 dark:border-red-800">
@@ -1023,6 +1143,129 @@ export default function ProfilePage() {
           </Tabs>
         </main>
       </div>
+
+      <AnimatePresence>
+        {showDeleteModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => !isDeleting && setShowDeleteModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.2 }}
+              className="bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-6 border-b border-neutral-200 dark:border-neutral-800 bg-red-50 dark:bg-red-900/20">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 rounded-full bg-red-100 dark:bg-red-900/40">
+                    <AlertTriangle className="h-6 w-6 text-red-600 dark:text-red-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-red-900 dark:text-red-100">
+                      Delete Account
+                    </h2>
+                    <p className="text-sm text-red-700 dark:text-red-300">
+                      This action cannot be undone
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <div className="space-y-3">
+                  <p className="text-neutral-700 dark:text-neutral-300">
+                    Are you sure you want to permanently delete your account?
+                    This will:
+                  </p>
+                  <ul className="list-disc list-inside space-y-1 text-sm text-neutral-600 dark:text-neutral-400">
+                    <li>Delete all your documents and files</li>
+                    <li>Remove all your personal data</li>
+                    <li>Cancel any active notifications</li>
+                    <li>Permanently close your account</li>
+                  </ul>
+                </div>
+
+                <div className="p-4 bg-neutral-100 dark:bg-neutral-800 rounded-lg">
+                  <Label
+                    htmlFor="deleteConfirm"
+                    className="text-sm font-medium text-neutral-700 dark:text-neutral-300"
+                  >
+                    Type <span className="font-bold text-red-600">DELETE</span>{" "}
+                    to confirm:
+                  </Label>
+                  <Input
+                    id="deleteConfirm"
+                    value={deleteConfirmText}
+                    onChange={(e) =>
+                      setDeleteConfirmText(e.target.value.toUpperCase())
+                    }
+                    placeholder="DELETE"
+                    className="mt-2"
+                    disabled={isDeleting}
+                  />
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    setShowDeleteModal(false);
+                    setDeleteConfirmText("");
+                  }}
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  className="flex-1"
+                  onClick={handleDeleteAccount}
+                  disabled={deleteConfirmText !== "DELETE" || isDeleting}
+                >
+                  {isDeleting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Account
+                    </>
+                  )}
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen bg-neutral-50 dark:bg-neutral-950">
+          <Sidebar />
+          <div className="flex-1 md:ml-72">
+            <div className="flex items-center justify-center h-96">
+              <Loader2 className="h-8 w-8 animate-spin text-[#A8BBA3]" />
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <ProfilePageContent />
+    </Suspense>
   );
 }

@@ -29,7 +29,31 @@ export async function proxy(request: NextRequest) {
     },
   );
 
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const isAuthPage =
+    request.nextUrl.pathname === "/login" ||
+    request.nextUrl.pathname === "/register";
+  const isDashboardPage = request.nextUrl.pathname.startsWith("/dashboard");
+  const isAuthCallback = request.nextUrl.pathname.startsWith("/auth/callback");
+
+  if (isAuthCallback) {
+    return supabaseResponse;
+  }
+
+  if (!user && isDashboardPage) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    return NextResponse.redirect(url);
+  }
+
+  if (user && isAuthPage) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/dashboard";
+    return NextResponse.redirect(url);
+  }
 
   return supabaseResponse;
 }

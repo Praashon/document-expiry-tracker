@@ -7,4 +7,15 @@ export function createSupabaseBrowserClient() {
   );
 }
 
+let supabaseBrowserInstance: ReturnType<
+  typeof createSupabaseBrowserClient
+> | null = null;
+
+export function getSupabaseBrowserClient() {
+  if (!supabaseBrowserInstance) {
+    supabaseBrowserInstance = createSupabaseBrowserClient();
+  }
+  return supabaseBrowserInstance;
+}
+
 export const supabaseBrowser = createSupabaseBrowserClient();

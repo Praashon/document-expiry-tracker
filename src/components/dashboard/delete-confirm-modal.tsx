@@ -70,7 +70,7 @@ export function DeleteConfirmModal({
                     <AlertTriangle className="w-5 h-5 text-red-500" />
                   </div>
                   <h2 className="text-xl font-semibold text-neutral-900 dark:text-white">
-                    Delete Document
+                    Confirm Document Removal
                   </h2>
                 </div>
                 <button
@@ -94,17 +94,18 @@ export function DeleteConfirmModal({
                 )}
 
                 <p className="text-neutral-600 dark:text-neutral-400">
-                  Are you sure you want to delete{" "}
+                  You are about to permanently remove{" "}
                   <span className="font-semibold text-neutral-900 dark:text-white">
                     &quot;{documentTitle}&quot;
-                  </span>
-                  ?
+                  </span>{" "}
+                  from your document library. Please confirm this action.
                 </p>
 
                 <div className="p-4 bg-red-50 dark:bg-red-900/10 rounded-lg border border-red-100 dark:border-red-900/20">
                   <p className="text-sm text-red-600 dark:text-red-400">
-                    <strong>Warning:</strong> This action cannot be undone. The
-                    document and any attached files will be permanently deleted.
+                    <strong>Notice:</strong> This operation is irreversible. All
+                    document data, metadata, and associated file attachments
+                    will be permanently removed from the system.
                   </p>
                 </div>
               </div>
@@ -117,7 +118,7 @@ export function DeleteConfirmModal({
                   disabled={isDeleting}
                   className="flex-1"
                 >
-                  Cancel
+                  Cancel Operation
                 </Button>
                 <Button
                   type="button"
@@ -129,10 +130,10 @@ export function DeleteConfirmModal({
                   {isDeleting ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Deleting...
+                      Processing Removal...
                     </>
                   ) : (
-                    "Delete Document"
+                    "Confirm Removal"
                   )}
                 </Button>
               </div>

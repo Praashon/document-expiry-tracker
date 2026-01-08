@@ -56,6 +56,14 @@ export default function RegisterPage() {
     setIsLoading(true);
     try {
       await registerUser(email, password, name);
+
+      // Send welcome email (fire and forget - don't block redirect)
+      fetch("/api/welcome", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, name }),
+      }).catch(console.error);
+
       window.location.href = "/dashboard";
     } catch (err: unknown) {
       const authErr = err as AuthError;
@@ -74,7 +82,10 @@ export default function RegisterPage() {
     } catch (err: unknown) {
       const authErr = err as AuthError;
       console.error("[Google Sign In] Error:", authErr);
-      setError(authErr.message || "Google sign in failed. Please try again.");
+      setError(
+        authErr.message ||
+          "Authentication failed. Please verify your credentials and try again.",
+      );
       setIsGoogleLoading(false);
     }
   };
@@ -118,10 +129,10 @@ export default function RegisterPage() {
             <User className="w-6 h-6" />
           </motion.div>
           <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-white">
-            Create an Account
+            Account Registration
           </h1>
           <p className="text-sm text-neutral-600 dark:text-neutral-400">
-            Get started with your free account
+            Create your DocTracker Enterprise account
           </p>
         </div>
 
@@ -137,7 +148,7 @@ export default function RegisterPage() {
           ) : (
             <>
               <GoogleIcon className="w-5 h-5" />
-              Continue with Google
+              Enterprise Google Authentication
             </>
           )}
         </motion.button>
@@ -173,7 +184,7 @@ export default function RegisterPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="block w-full pl-10 pr-3 py-2.5 bg-neutral-50 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl focus:ring-2 focus:ring-[#A8BBA3]/20 focus:border-[#A8BBA3] transition-all duration-200 outline-none text-neutral-900 dark:text-white placeholder-neutral-400"
-                  placeholder="John Doe"
+                  placeholder="Enter your full name"
                   required
                 />
               </div>
@@ -197,7 +208,7 @@ export default function RegisterPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="block w-full pl-10 pr-3 py-2.5 bg-neutral-50 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl focus:ring-2 focus:ring-[#A8BBA3]/20 focus:border-[#A8BBA3] transition-all duration-200 outline-none text-neutral-900 dark:text-white placeholder-neutral-400"
-                  placeholder="you@example.com"
+                  placeholder="Enter your email address"
                   required
                 />
               </div>
@@ -221,7 +232,7 @@ export default function RegisterPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="block w-full pl-10 pr-3 py-2.5 bg-neutral-50 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl focus:ring-2 focus:ring-[#A8BBA3]/20 focus:border-[#A8BBA3] transition-all duration-200 outline-none text-neutral-900 dark:text-white placeholder-neutral-400"
-                  placeholder="••••••••"
+                  placeholder="Create a secure password"
                   required
                 />
               </div>
@@ -251,7 +262,7 @@ export default function RegisterPage() {
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
                 <>
-                  Create Account <ArrowRight className="w-4 h-4" />
+                  Register Account <ArrowRight className="w-4 h-4" />
                 </>
               )}
             </button>
@@ -264,7 +275,7 @@ export default function RegisterPage() {
             href="/login"
             className="font-semibold text-[#A8BBA3] hover:text-[#92a88d] hover:underline transition-all"
           >
-            Sign in
+            Access Account
           </Link>
         </div>
       </motion.div>

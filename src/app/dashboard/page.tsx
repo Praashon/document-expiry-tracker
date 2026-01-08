@@ -47,8 +47,8 @@ import {
 } from "@/lib/document-actions";
 import { DOCUMENT_TYPE_CONFIG } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
+import { useToast } from "@/components/ui/toast";
 
-// Icon mapping for document types
 const TYPE_ICONS: Record<DocumentType, React.ElementType> = {
   "Rent Agreement": Home,
   Insurance: Shield,
@@ -119,6 +119,7 @@ function formatDate(dateString: string | null | undefined): string {
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { addToast } = useToast();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [refresh, setRefresh] = useState(false);
   const router = useRouter();
@@ -157,7 +158,6 @@ export default function DashboardPage() {
     }
   }, [refresh, user]);
 
-  // Listen for quick add document event from sidebar
   useEffect(() => {
     const handleAddDocument = () => {
       setIsAddModalOpen(true);
@@ -185,9 +185,8 @@ export default function DashboardPage() {
     setRefresh(!refresh);
   };
 
-  // Calculate stats
   const stats = useMemo(() => {
-    let total = documents.length;
+    const total = documents.length;
     let expiringSoon = 0;
     let expired = 0;
     let identity = 0;
@@ -204,11 +203,9 @@ export default function DashboardPage() {
     return { total, expiringSoon, expired, identity };
   }, [documents]);
 
-  // Filter documents
   const filteredDocuments = useMemo(() => {
     let result = [...documents];
 
-    // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       result = result.filter(
@@ -219,7 +216,6 @@ export default function DashboardPage() {
       );
     }
 
-    // Tab filter
     if (activeTab === "expiring") {
       result = result.filter((doc) => {
         const config = DOCUMENT_TYPE_CONFIG[doc.type as DocumentType];
@@ -232,12 +228,10 @@ export default function DashboardPage() {
       });
     }
 
-    // Sort by expiration date (soonest first), then by created date
     result.sort((a, b) => {
       const statusA = getDocumentStatus(a.expiration_date);
       const statusB = getDocumentStatus(b.expiration_date);
 
-      // Expired and expiring soon documents first
       const priority: Record<string, number> = {
         expired: 0,
         expiring_soon: 1,
@@ -249,7 +243,6 @@ export default function DashboardPage() {
         return priority[statusA] - priority[statusB];
       }
 
-      // Then by expiration date
       if (a.expiration_date && b.expiration_date) {
         return (
           new Date(a.expiration_date).getTime() -
@@ -257,11 +250,9 @@ export default function DashboardPage() {
         );
       }
 
-      // Documents with expiration before those without
       if (a.expiration_date && !b.expiration_date) return -1;
       if (!a.expiration_date && b.expiration_date) return 1;
 
-      // Finally by created date
       return (
         new Date(b.created_at || 0).getTime() -
         new Date(a.created_at || 0).getTime()
@@ -290,7 +281,11 @@ export default function DashboardPage() {
 
   const handleDownload = async (document: Document) => {
     if (!document.file_path) {
-      alert("No file attached to this document");
+      addToast({
+        type: "warning",
+        title: "No File Available",
+        message: "This document does not have an attached file to download.",
+      });
       return;
     }
 
@@ -298,9 +293,19 @@ export default function DashboardPage() {
       setOpenMenuId(null);
       const downloadUrl = await getFileDownloadUrl(document.file_path);
       window.open(downloadUrl, "_blank");
+      addToast({
+        type: "success",
+        title: "Download Started",
+        message: "Your document download has been initiated successfully.",
+      });
     } catch (error) {
       console.error("Error downloading file:", error);
-      alert("Failed to download file");
+      addToast({
+        type: "error",
+        title: "Download Failed",
+        message:
+          "Unable to download the file. Please try again or contact support.",
+      });
     }
   };
 
@@ -347,7 +352,6 @@ export default function DashboardPage() {
         <Header user={user} />
 
         <main className="p-4 md:p-6 lg:p-8 max-w-6xl mx-auto">
-          {/* Stats Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             <motion.div
               initial={{ opacity: 0, y: 10 }}
@@ -395,9 +399,7 @@ export default function DashboardPage() {
             </motion.div>
           </div>
 
-          {/* Search and Tabs */}
           <div className="flex flex-col sm:flex-row gap-3 mb-6">
-            {/* Search */}
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
               <input
@@ -409,7 +411,6 @@ export default function DashboardPage() {
               />
             </div>
 
-            {/* Tabs */}
             <div className="flex bg-neutral-100 dark:bg-neutral-800 rounded-xl p-1">
               {(["all", "expiring", "identity"] as const).map((tab) => (
                 <button
@@ -428,7 +429,6 @@ export default function DashboardPage() {
               ))}
             </div>
 
-            {/* Add Button */}
             <Button
               onClick={() => setIsAddModalOpen(true)}
               className="bg-[#A8BBA3] hover:bg-[#96ab91] text-white rounded-xl px-5"
@@ -438,7 +438,6 @@ export default function DashboardPage() {
             </Button>
           </div>
 
-          {/* Documents List */}
           {filteredDocuments.length === 0 ? (
             <motion.div
               initial={{ opacity: 0 }}
@@ -488,7 +487,6 @@ export default function DashboardPage() {
                       className="group bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 hover:border-[#A8BBA3]/50 transition-all"
                     >
                       <div className="flex items-center gap-4 p-4">
-                        {/* Icon */}
                         <div
                           className={`shrink-0 p-2.5 rounded-xl ${config?.bgColor || "bg-neutral-100 dark:bg-neutral-800"}`}
                         >
@@ -497,7 +495,6 @@ export default function DashboardPage() {
                           />
                         </div>
 
-                        {/* Content */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-0.5">
                             <h3 className="font-medium text-neutral-900 dark:text-white truncate">
@@ -528,7 +525,6 @@ export default function DashboardPage() {
                           </div>
                         </div>
 
-                        {/* Days indicator */}
                         {daysUntil !== null && (
                           <div className="hidden sm:block text-right shrink-0">
                             <p
@@ -547,7 +543,6 @@ export default function DashboardPage() {
                           </div>
                         )}
 
-                        {/* Actions */}
                         <div className="relative shrink-0">
                           <button
                             onClick={() =>
@@ -612,7 +607,6 @@ export default function DashboardPage() {
         </main>
       </div>
 
-      {/* Modals */}
       <AddDocumentModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
@@ -652,7 +646,6 @@ export default function DashboardPage() {
         </>
       )}
 
-      {/* Click outside to close menu */}
       {openMenuId && (
         <div
           className="fixed inset-0 z-0"

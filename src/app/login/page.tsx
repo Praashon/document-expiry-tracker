@@ -1,4 +1,5 @@
 "use client";
+
 import { useState } from "react";
 import Link from "next/link";
 import { loginUser, signInWithGoogle } from "@/lib/auth-actions";
@@ -70,7 +71,10 @@ export default function LoginPage() {
     } catch (err: unknown) {
       const authErr = err as AuthError;
       console.error("[Google Sign In] Error:", authErr);
-      setError(authErr.message || "Google sign in failed. Please try again.");
+      setError(
+        authErr.message ||
+          "Authentication failed. Please verify your credentials and try again.",
+      );
       setIsGoogleLoading(false);
     }
   };
@@ -114,10 +118,10 @@ export default function LoginPage() {
             <Lock className="w-6 h-6" />
           </motion.div>
           <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-white">
-            Welcome Back
+            Account Access
           </h1>
           <p className="text-sm text-neutral-600 dark:text-neutral-400">
-            Sign in to access your account
+            Access your DocTracker Enterprise dashboard
           </p>
         </div>
 
@@ -133,7 +137,7 @@ export default function LoginPage() {
           ) : (
             <>
               <GoogleIcon className="w-5 h-5" />
-              Continue with Google
+              Enterprise Google Authentication
             </>
           )}
         </motion.button>
@@ -169,7 +173,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="block w-full pl-10 pr-3 py-2.5 bg-neutral-50 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl focus:ring-2 focus:ring-[#A8BBA3]/20 focus:border-[#A8BBA3] transition-all duration-200 outline-none text-neutral-900 dark:text-white placeholder-neutral-400"
-                  placeholder="you@example.com"
+                  placeholder="Enter your email address"
                   required
                 />
               </div>
@@ -193,7 +197,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="block w-full pl-10 pr-3 py-2.5 bg-neutral-50 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-xl focus:ring-2 focus:ring-[#A8BBA3]/20 focus:border-[#A8BBA3] transition-all duration-200 outline-none text-neutral-900 dark:text-white placeholder-neutral-400"
-                  placeholder="••••••••"
+                  placeholder="Enter your password"
                   required
                 />
               </div>
@@ -220,7 +224,7 @@ export default function LoginPage() {
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
                 <>
-                  Sign in <ArrowRight className="w-4 h-4" />
+                  Access Dashboard <ArrowRight className="w-4 h-4" />
                 </>
               )}
             </button>

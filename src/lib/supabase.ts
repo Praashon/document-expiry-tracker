@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createBrowserClient } from "@supabase/ssr";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -7,17 +7,15 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error("Missing Supabase environment variables");
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey);
 
 export type DocumentType =
-  // Expiring Documents
   | "Rent Agreement"
   | "Insurance"
   | "Subscription"
   | "License"
   | "Warranty"
   | "Contract"
-  // Identity Documents
   | "Citizenship"
   | "PAN Card"
   | "National ID"
@@ -163,7 +161,6 @@ export const DOCUMENT_TYPE_CONFIG: Record<
     hasExpiry: false,
     hasDocumentNumber: true,
   },
-  // Other
   Other: {
     category: "other",
     color: "text-neutral-600 dark:text-neutral-400",

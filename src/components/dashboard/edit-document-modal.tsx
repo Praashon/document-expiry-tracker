@@ -15,10 +15,19 @@ interface EditDocumentModalProps {
 }
 
 const documentTypes: DocumentType[] = [
-  "Rent",
+  "Rent Agreement",
   "Insurance",
   "Subscription",
   "License",
+  "Warranty",
+  "Contract",
+  "Citizenship",
+  "PAN Card",
+  "National ID",
+  "Passport",
+  "Driving License",
+  "Voter ID",
+  "Birth Certificate",
   "Other",
 ];
 
