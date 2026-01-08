@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback, Suspense, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -21,6 +21,8 @@ import {
   Globe,
   Trash2,
   Copy,
+  X,
+  CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,6 +63,140 @@ interface GooglePasswordSetup {
   confirmEmail: string;
   newPassword: string;
   confirmPassword: string;
+}
+
+interface PasswordRequirement {
+  label: string;
+  test: (password: string) => boolean;
+}
+
+const passwordRequirements: PasswordRequirement[] = [
+  { label: "At least 6 characters", test: (p) => p.length >= 6 },
+  { label: "Contains uppercase letter", test: (p) => /[A-Z]/.test(p) },
+  { label: "Contains lowercase letter", test: (p) => /[a-z]/.test(p) },
+  { label: "Contains a number", test: (p) => /[0-9]/.test(p) },
+  {
+    label: "Contains special character (!@#$%^&*)",
+    test: (p) => /[!@#$%^&*(),.?":{}|<>]/.test(p),
+  },
+];
+
+function PasswordStrengthIndicator({
+  password,
+  confirmPassword,
+}: {
+  password: string;
+  confirmPassword?: string;
+}) {
+  const results = useMemo(() => {
+    return passwordRequirements.map((req) => ({
+      ...req,
+      passed: req.test(password),
+    }));
+  }, [password]);
+
+  const passedCount = results.filter((r) => r.passed).length;
+  const strengthPercent = (passedCount / passwordRequirements.length) * 100;
+  const passwordsMatch =
+    confirmPassword !== undefined
+      ? password === confirmPassword && password.length > 0
+      : null;
+
+  const getStrengthColor = () => {
+    if (strengthPercent <= 20) return "bg-red-500";
+    if (strengthPercent <= 40) return "bg-orange-500";
+    if (strengthPercent <= 60) return "bg-yellow-500";
+    if (strengthPercent <= 80) return "bg-lime-500";
+    return "bg-green-500";
+  };
+
+  const getStrengthLabel = () => {
+    if (strengthPercent <= 20) return "Very Weak";
+    if (strengthPercent <= 40) return "Weak";
+    if (strengthPercent <= 60) return "Fair";
+    if (strengthPercent <= 80) return "Good";
+    return "Strong";
+  };
+
+  if (!password) return null;
+
+  return (
+    <div className="mt-3 space-y-3">
+      {/* Strength bar */}
+      <div className="space-y-1">
+        <div className="flex justify-between text-xs">
+          <span className="text-neutral-500 dark:text-neutral-400">
+            Password Strength
+          </span>
+          <span
+            className={`font-medium ${
+              strengthPercent <= 40
+                ? "text-red-500"
+                : strengthPercent <= 60
+                  ? "text-yellow-500"
+                  : "text-green-500"
+            }`}
+          >
+            {getStrengthLabel()}
+          </span>
+        </div>
+        <div className="h-1.5 bg-neutral-200 dark:bg-neutral-700 rounded-full overflow-hidden">
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${strengthPercent}%` }}
+            transition={{ duration: 0.3 }}
+            className={`h-full ${getStrengthColor()} rounded-full`}
+          />
+        </div>
+      </div>
+
+      {/* Requirements checklist */}
+      <div className="grid grid-cols-1 gap-1.5">
+        {results.map((req, index) => (
+          <motion.div
+            key={index}
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: index * 0.05 }}
+            className={`flex items-center gap-2 text-xs ${
+              req.passed
+                ? "text-green-600 dark:text-green-400"
+                : "text-neutral-400 dark:text-neutral-500"
+            }`}
+          >
+            {req.passed ? (
+              <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0" />
+            ) : (
+              <X className="h-3.5 w-3.5 flex-shrink-0" />
+            )}
+            <span>{req.label}</span>
+          </motion.div>
+        ))}
+
+        {/* Password match indicator */}
+        {passwordsMatch !== null && confirmPassword && (
+          <motion.div
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            className={`flex items-center gap-2 text-xs mt-1 ${
+              passwordsMatch
+                ? "text-green-600 dark:text-green-400"
+                : "text-red-500 dark:text-red-400"
+            }`}
+          >
+            {passwordsMatch ? (
+              <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0" />
+            ) : (
+              <X className="h-3.5 w-3.5 flex-shrink-0" />
+            )}
+            <span>
+              {passwordsMatch ? "Passwords match" : "Passwords do not match"}
+            </span>
+          </motion.div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function ProfilePageContent() {
@@ -294,16 +430,21 @@ function ProfilePageContent() {
   const handlePasswordChange = async () => {
     if (!user || !profileData) return;
 
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setMessage({ type: "error", text: "New passwords do not match" });
+    // Check all password requirements
+    const allRequirementsMet = passwordRequirements.every((req) =>
+      req.test(passwordData.newPassword),
+    );
+
+    if (!allRequirementsMet) {
+      setMessage({
+        type: "error",
+        text: "Please meet all password requirements",
+      });
       return;
     }
 
-    if (passwordData.newPassword.length < 6) {
-      setMessage({
-        type: "error",
-        text: "Password must be at least 6 characters",
-      });
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setMessage({ type: "error", text: "Passwords do not match" });
       return;
     }
 
@@ -362,16 +503,21 @@ function ProfilePageContent() {
       return;
     }
 
-    if (googlePasswordData.newPassword !== googlePasswordData.confirmPassword) {
-      setMessage({ type: "error", text: "Passwords do not match" });
+    // Check all password requirements
+    const allRequirementsMet = passwordRequirements.every((req) =>
+      req.test(googlePasswordData.newPassword),
+    );
+
+    if (!allRequirementsMet) {
+      setMessage({
+        type: "error",
+        text: "Please meet all password requirements",
+      });
       return;
     }
 
-    if (googlePasswordData.newPassword.length < 6) {
-      setMessage({
-        type: "error",
-        text: "Password must be at least 6 characters",
-      });
+    if (googlePasswordData.newPassword !== googlePasswordData.confirmPassword) {
+      setMessage({ type: "error", text: "Passwords do not match" });
       return;
     }
 
@@ -533,11 +679,22 @@ function ProfilePageContent() {
       const fileExt = file.name.split(".").pop();
       const fileName = `${user?.id}-${Date.now()}.${fileExt}`;
 
+      // Try to upload, if bucket doesn't exist show helpful message
       const { error } = await supabase.storage
         .from("avatars")
         .upload(fileName, file, { upsert: true });
 
-      if (error) throw error;
+      if (error) {
+        if (
+          error.message.includes("Bucket not found") ||
+          error.message.includes("bucket")
+        ) {
+          throw new Error(
+            "Avatar storage is not configured. Please create an 'avatars' bucket in your Supabase Storage with public access enabled.",
+          );
+        }
+        throw error;
+      }
 
       const {
         data: { publicUrl },
@@ -810,7 +967,7 @@ function ProfilePageContent() {
                                 newPassword: e.target.value,
                               }))
                             }
-                            placeholder="Enter a secure password (minimum 6 characters)"
+                            placeholder="Enter a secure password"
                           />
                           <button
                             type="button"
@@ -829,6 +986,10 @@ function ProfilePageContent() {
                             )}
                           </button>
                         </div>
+                        <PasswordStrengthIndicator
+                          password={googlePasswordData.newPassword}
+                          confirmPassword={googlePasswordData.confirmPassword}
+                        />
                       </div>
 
                       <div className="space-y-2">
@@ -940,7 +1101,7 @@ function ProfilePageContent() {
                                 newPassword: e.target.value,
                               }))
                             }
-                            placeholder="Enter a secure password (minimum 6 characters)"
+                            placeholder="Enter a secure password"
                           />
                           <button
                             type="button"
@@ -959,6 +1120,10 @@ function ProfilePageContent() {
                             )}
                           </button>
                         </div>
+                        <PasswordStrengthIndicator
+                          password={passwordData.newPassword}
+                          confirmPassword={passwordData.confirmPassword}
+                        />
                       </div>
 
                       <div className="space-y-2">
