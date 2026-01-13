@@ -3,7 +3,14 @@ import { useState } from "react";
 import Link from "next/link";
 import { registerUser, signInWithGoogle } from "@/lib/auth-actions";
 import { motion } from "framer-motion";
-import { User, Mail, Lock, Loader2, ArrowRight, CheckCircle } from "lucide-react";
+import {
+  User,
+  Mail,
+  Lock,
+  Loader2,
+  ArrowRight,
+  CheckCircle,
+} from "lucide-react";
 
 interface AuthError {
   message?: string;
@@ -86,7 +93,7 @@ export default function RegisterPage() {
       console.error("[Google Sign In] Error:", authErr);
       setError(
         authErr.message ||
-        "Authentication failed. Please verify your credentials and try again.",
+        "Authentication failed. Please verify your credentials and try again."
       );
       setIsGoogleLoading(false);
     }
@@ -135,10 +142,14 @@ export default function RegisterPage() {
               Check Your Email
             </h1>
             <p className="text-neutral-600 dark:text-neutral-400">
-              We&apos;ve sent a verification link to <strong className="text-neutral-900 dark:text-white">{email}</strong>
+              We&apos;ve sent a verification link to{" "}
+              <strong className="text-neutral-900 dark:text-white">
+                {email}
+              </strong>
             </p>
             <p className="text-sm text-neutral-500 dark:text-neutral-500">
-              Please click the link in your email to verify your account. Once verified, you can log in.
+              Please click the link in your email to verify your account. Once
+              verified, you can log in.
             </p>
             <div className="pt-4">
               <Link
@@ -287,7 +298,10 @@ export default function RegisterPage() {
                 </motion.div>
               )}
 
-              <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}>
+              <motion.div
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.98 }}
+              >
                 <button
                   type="submit"
                   disabled={isLoading || isGoogleLoading}
