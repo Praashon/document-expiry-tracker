@@ -65,13 +65,6 @@ export default function RegisterPage() {
     try {
       await registerUser(email, password, name);
 
-      // Send welcome email (fire and forget - don't block redirect)
-      fetch("/api/welcome", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, name }),
-      }).catch(console.error);
-
       setRegistrationSuccess(true);
       setIsLoading(false);
     } catch (err: unknown) {
