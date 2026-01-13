@@ -102,7 +102,7 @@ export default function RegisterPage() {
             opacity: [0.1, 0.2, 0.1],
           }}
           transition={{ duration: 22, repeat: Infinity, ease: "linear" }}
-          className="absolute -top-1/2 -right-1/2 w-full h-full bg-gradient-to-bl from-[#A8BBA3]/20 to-transparent rounded-full blur-3xl"
+          className="absolute -top-1/2 -right-1/2 w-full h-full bg-linear-to-bl from-[#A8BBA3]/20 to-transparent rounded-full blur-3xl"
         />
         <motion.div
           animate={{
@@ -111,7 +111,7 @@ export default function RegisterPage() {
             opacity: [0.1, 0.15, 0.1],
           }}
           transition={{ duration: 28, repeat: Infinity, ease: "linear" }}
-          className="absolute -bottom-1/2 -left-1/2 w-full h-full bg-gradient-to-tr from-[#A8BBA3]/20 to-transparent rounded-full blur-3xl"
+          className="absolute -bottom-1/2 -left-1/2 w-full h-full bg-linear-to-tr from-[#A8BBA3]/20 to-transparent rounded-full blur-3xl"
         />
       </div>
 

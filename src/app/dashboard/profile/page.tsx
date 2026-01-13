@@ -132,10 +132,10 @@ function PasswordStrengthIndicator({
           </span>
           <span
             className={`font-medium ${strengthPercent <= 40
-                ? "text-red-500"
-                : strengthPercent <= 60
-                  ? "text-yellow-500"
-                  : "text-green-500"
+              ? "text-red-500"
+              : strengthPercent <= 60
+                ? "text-yellow-500"
+                : "text-green-500"
               }`}
           >
             {getStrengthLabel()}
@@ -160,8 +160,8 @@ function PasswordStrengthIndicator({
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: index * 0.05 }}
             className={`flex items-center gap-2 text-xs ${req.passed
-                ? "text-green-600 dark:text-green-400"
-                : "text-neutral-400 dark:text-neutral-500"
+              ? "text-green-600 dark:text-green-400"
+              : "text-neutral-400 dark:text-neutral-500"
               }`}
           >
             {req.passed ? (
@@ -179,8 +179,8 @@ function PasswordStrengthIndicator({
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
             className={`flex items-center gap-2 text-xs mt-1 ${passwordsMatch
-                ? "text-green-600 dark:text-green-400"
-                : "text-red-500 dark:text-red-400"
+              ? "text-green-600 dark:text-green-400"
+              : "text-red-500 dark:text-red-400"
               }`}
           >
             {passwordsMatch ? (
@@ -764,7 +764,7 @@ function ProfilePageContent() {
 
   if (loading || isLoading) {
     return (
-      <div className="flex min-h-screen bg-neutral-50 dark:bg-neutral-950">
+      <div className="flex min-h-screen bg-transparent">
         <Sidebar />
         <div className="flex-1 md:ml-16">
           <Header user={user} sidebarCollapsed={true} />
@@ -777,7 +777,7 @@ function ProfilePageContent() {
   }
 
   return (
-    <div className="flex min-h-screen bg-neutral-50 dark:bg-neutral-950">
+    <div className="flex min-h-screen bg-transparent">
       <Sidebar />
 
       <div className="flex-1 md:ml-16">
@@ -806,8 +806,8 @@ function ProfilePageContent() {
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               className={`mb-6 p-4 rounded-lg border ${message.type === "success"
-                  ? "bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400"
-                  : "bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400"
+                ? "bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400"
+                : "bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400"
                 }`}
             >
               <div className="flex items-center gap-2">
@@ -909,7 +909,7 @@ function ProfilePageContent() {
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 p-4 bg-gradient-to-r from-neutral-50 to-neutral-100 dark:from-neutral-800/30 dark:to-neutral-800/50 rounded-lg border border-neutral-200/50 dark:border-neutral-700/50">
+                  <div className="grid grid-cols-2 gap-4 p-4 bg-linear-to-r from-neutral-50 to-neutral-100 dark:from-neutral-800/30 dark:to-neutral-800/50 rounded-lg border border-neutral-200/50 dark:border-neutral-700/50">
                     <div className="flex items-center gap-2">
                       <Globe className="h-4 w-4 text-neutral-500" />
                       <div>
@@ -1549,8 +1549,8 @@ function ProfilePageContent() {
                       <div
                         key={interval.days}
                         className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${notificationIntervals.includes(interval.days)
-                            ? "bg-[#A8BBA3]/10 border-[#A8BBA3] dark:bg-[#A8BBA3]/5"
-                            : "bg-neutral-50 border-neutral-200 dark:bg-neutral-800/50 dark:border-neutral-700"
+                          ? "bg-[#A8BBA3]/10 border-[#A8BBA3] dark:bg-[#A8BBA3]/5"
+                          : "bg-neutral-50 border-neutral-200 dark:bg-neutral-800/50 dark:border-neutral-700"
                           }`}
                       >
                         <div className="flex-1">

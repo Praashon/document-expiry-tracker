@@ -215,7 +215,7 @@ export default function AnalyticsPage() {
 
   if (loading || isLoading) {
     return (
-      <div className="flex min-h-screen bg-neutral-50 dark:bg-neutral-950">
+      <div className="flex min-h-screen bg-transparent">
         <Sidebar />
         <div className="flex-1 md:ml-16">
           <Header user={user} sidebarCollapsed={true} />
@@ -249,7 +249,7 @@ export default function AnalyticsPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-neutral-50 dark:bg-neutral-950 overflow-x-hidden">
+    <div className="flex min-h-screen bg-transparent overflow-x-hidden w-full relative">
       <Sidebar />
 
       <div className="flex-1 md:ml-16">

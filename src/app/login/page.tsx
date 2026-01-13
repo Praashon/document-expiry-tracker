@@ -180,7 +180,7 @@ function LoginPageContent() {
       console.error("[Google Sign In] Error:", authErr);
       setError(
         authErr.message ||
-          "Authentication failed. Please verify your credentials and try again.",
+        "Authentication failed. Please verify your credentials and try again.",
       );
       setIsGoogleLoading(false);
     }
@@ -196,7 +196,7 @@ function LoginPageContent() {
             opacity: [0.1, 0.2, 0.1],
           }}
           transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-          className="absolute -top-1/2 -left-1/2 w-full h-full bg-gradient-to-br from-[#A8BBA3]/20 to-transparent rounded-full blur-3xl"
+          className="absolute -top-1/2 -left-1/2 w-full h-full bg-linear-to-br from-[#A8BBA3]/20 to-transparent rounded-full blur-3xl"
         />
         <motion.div
           animate={{
@@ -205,7 +205,7 @@ function LoginPageContent() {
             opacity: [0.1, 0.15, 0.1],
           }}
           transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
-          className="absolute -bottom-1/2 -right-1/2 w-full h-full bg-gradient-to-tl from-[#A8BBA3]/20 to-transparent rounded-full blur-3xl"
+          className="absolute -bottom-1/2 -right-1/2 w-full h-full bg-linear-to-tl from-[#A8BBA3]/20 to-transparent rounded-full blur-3xl"
         />
       </div>
 

@@ -29,14 +29,14 @@ export function ProfileDropdown({ user }: ProfileDropdownProps) {
     (i: { provider?: string }) => i.provider === "google",
   ) as
     | {
-        provider?: string;
-        identity_data?: {
-          name?: string;
-          full_name?: string;
-          avatar_url?: string;
-          picture?: string;
-        };
-      }
+      provider?: string;
+      identity_data?: {
+        name?: string;
+        full_name?: string;
+        avatar_url?: string;
+        picture?: string;
+      };
+    }
     | undefined;
 
   const userName =
@@ -134,7 +134,7 @@ export function ProfileDropdown({ user }: ProfileDropdownProps) {
                 referrerPolicy="no-referrer"
               />
             ) : (
-              <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-[#A8BBA3] to-[#8FA58F] flex items-center justify-center text-white text-sm font-bold shadow-md">
+              <div className="h-8 w-8 rounded-full bg-linear-to-tr from-[#A8BBA3] to-[#8FA58F] flex items-center justify-center text-white text-sm font-bold shadow-md">
                 {userName.charAt(0).toUpperCase()}
               </div>
             )}
@@ -152,9 +152,8 @@ export function ProfileDropdown({ user }: ProfileDropdownProps) {
         </div>
 
         <ChevronDown
-          className={`h-4 w-4 text-neutral-500 transition-transform duration-200 ${
-            isOpen ? "rotate-180" : ""
-          }`}
+          className={`h-4 w-4 text-neutral-500 transition-transform duration-200 ${isOpen ? "rotate-180" : ""
+            }`}
         />
       </Button>
 
@@ -177,7 +176,7 @@ export function ProfileDropdown({ user }: ProfileDropdownProps) {
                     referrerPolicy="no-referrer"
                   />
                 ) : (
-                  <div className="h-10 w-10 rounded-full bg-gradient-to-tr from-[#A8BBA3] to-[#8FA58F] flex items-center justify-center text-white text-sm font-bold shadow-md">
+                  <div className="h-10 w-10 rounded-full bg-linear-to-tr from-[#A8BBA3] to-[#8FA58F] flex items-center justify-center text-white text-sm font-bold shadow-md">
                     {userName.charAt(0).toUpperCase()}
                   </div>
                 )}
@@ -197,18 +196,16 @@ export function ProfileDropdown({ user }: ProfileDropdownProps) {
                 <button
                   key={index}
                   onClick={item.onClick}
-                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${
-                    item.variant === "danger"
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${item.variant === "danger"
                       ? "text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/10"
                       : "text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                  }`}
+                    }`}
                 >
                   <item.icon
-                    className={`h-4 w-4 ${
-                      item.variant === "danger"
+                    className={`h-4 w-4 ${item.variant === "danger"
                         ? "text-red-500"
                         : "text-neutral-500 dark:text-neutral-400"
-                    }`}
+                      }`}
                   />
                   {item.label}
                 </button>

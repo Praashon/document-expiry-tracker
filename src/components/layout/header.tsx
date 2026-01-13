@@ -17,10 +17,10 @@ export function Header({ user, sidebarCollapsed = true }: HeaderProps) {
       <div className="flex items-center gap-3">
         {/*{sidebarCollapsed && (
           <Link href="/dashboard" className="flex items-center gap-2 md:flex">
-            <div className="relative h-8 w-8 rounded-lg bg-gradient-to-br from-[#A8BBA3] via-[#8FA58F] to-[#6B8E6B] flex items-center justify-center shadow-sm">
+            <div className="relative h-8 w-8 rounded-lg bg-linear-to-br from-[#A8BBA3] via-[#8FA58F] to-[#6B8E6B] flex items-center justify-center shadow-sm">
               <ShieldCheck className="h-4 w-4 text-white" />
             </div>
-            <span className="text-lg font-bold bg-gradient-to-r from-[#A8BBA3] to-[#6B8E6B] bg-clip-text text-transparent hidden sm:inline">
+            <span className="text-lg font-bold bg-linear-to-r from-[#A8BBA3] to-[#6B8E6B] bg-clip-text text-transparent hidden sm:inline">
               DocTracker
             </span>
           </Link>

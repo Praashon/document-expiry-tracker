@@ -79,7 +79,7 @@ export function Sidebar({
         )}
       >
         <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="relative h-9 w-9 rounded-lg bg-gradient-to-br from-[#A8BBA3] via-[#8FA58F] to-[#6B8E6B] flex items-center justify-center shadow-md flex-shrink-0">
+          <div className="relative h-9 w-9 rounded-lg bg-linear-to-br from-[#A8BBA3] via-[#8FA58F] to-[#6B8E6B] flex items-center justify-center shadow-md shrink-0">
             <ShieldCheck className="h-4 w-4 text-white" />
           </div>
           <AnimatePresence mode="wait">
@@ -88,7 +88,7 @@ export function Sidebar({
                 initial={{ opacity: 0, width: 0 }}
                 animate={{ opacity: 1, width: "auto" }}
                 exit={{ opacity: 0, width: 0 }}
-                className="text-lg font-bold bg-gradient-to-r from-[#A8BBA3] to-[#6B8E6B] bg-clip-text text-transparent whitespace-nowrap overflow-hidden"
+                className="text-lg font-bold bg-linear-to-r from-[#A8BBA3] to-[#6B8E6B] bg-clip-text text-transparent whitespace-nowrap overflow-hidden"
               >
                 DocTracker
               </motion.span>
@@ -130,7 +130,7 @@ export function Sidebar({
                   <motion.div
                     layoutId="sidebar-indicator"
                     className={cn(
-                      "absolute left-0 top-1/2 -translate-y-1/2 w-1 bg-gradient-to-b from-[#A8BBA3] to-[#8FA58F] rounded-r-full",
+                      "absolute left-0 top-1/2 -translate-y-1/2 w-1 bg-linear-to-b from-[#A8BBA3] to-[#8FA58F] rounded-r-full",
                       collapsed ? "h-6" : "h-8",
                     )}
                     transition={{ type: "spring", stiffness: 300, damping: 30 }}
@@ -138,7 +138,7 @@ export function Sidebar({
                 )}
                 <item.icon
                   className={cn(
-                    "flex-shrink-0",
+                    "shrink-0",
                     collapsed ? "h-5 w-5" : "h-4 w-4",
                     isActive
                       ? "text-[#A8BBA3]"
@@ -214,10 +214,10 @@ export function Sidebar({
             >
               <div className="flex h-14 items-center justify-between px-4 border-b border-neutral-200 dark:border-neutral-800">
                 <Link href="/dashboard" className="flex items-center gap-2">
-                  <div className="relative h-9 w-9 rounded-lg bg-gradient-to-br from-[#A8BBA3] via-[#8FA58F] to-[#6B8E6B] flex items-center justify-center shadow-md">
+                  <div className="relative h-9 w-9 rounded-lg bg-linear-to-br from-[#A8BBA3] via-[#8FA58F] to-[#6B8E6B] flex items-center justify-center shadow-md">
                     <ShieldCheck className="h-4 w-4 text-white" />
                   </div>
-                  <span className="text-lg font-bold bg-gradient-to-r from-[#A8BBA3] to-[#6B8E6B] bg-clip-text text-transparent">
+                  <span className="text-lg font-bold bg-linear-to-r from-[#A8BBA3] to-[#6B8E6B] bg-clip-text text-transparent">
                     DocTracker
                   </span>
                 </Link>
@@ -249,11 +249,11 @@ export function Sidebar({
                         )}
                       >
                         {isActive && (
-                          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-[#A8BBA3] to-[#8FA58F] rounded-r-full" />
+                          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-linear-to-b from-[#A8BBA3] to-[#8FA58F] rounded-r-full" />
                         )}
                         <item.icon
                           className={cn(
-                            "h-4 w-4 flex-shrink-0",
+                            "h-4 w-4 shrink-0",
                             isActive
                               ? "text-[#A8BBA3]"
                               : "text-neutral-500 dark:text-neutral-400",
