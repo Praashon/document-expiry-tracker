@@ -444,11 +444,10 @@ export default function DashboardPage() {
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    activeTab === tab
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === tab
                       ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-sm"
                       : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
-                  }`}
+                    }`}
                 >
                   {tab === "all" && "All Documents"}
                   {tab === "expiring" && "Renewal Required"}
@@ -570,13 +569,12 @@ export default function DashboardPage() {
                         {daysUntil !== null && (
                           <div className="hidden sm:block text-right shrink-0">
                             <p
-                              className={`text-sm font-medium ${
-                                daysUntil < 0
+                              className={`text-sm font-medium ${daysUntil < 0
                                   ? "text-red-600"
                                   : daysUntil <= 30
                                     ? "text-orange-600"
                                     : "text-neutral-500"
-                              }`}
+                                }`}
                             >
                               {daysUntil < 0
                                 ? `${Math.abs(daysUntil)}d overdue`
