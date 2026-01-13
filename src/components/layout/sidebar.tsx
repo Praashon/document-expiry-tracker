@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Menu,
   X,
+  HelpCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -31,6 +32,11 @@ const menuItems = [
     icon: TrendingUp,
     label: "Analytics",
     href: "/dashboard/analytics",
+  },
+  {
+    icon: HelpCircle,
+    label: "Help",
+    href: "/dashboard/help",
   },
 ];
 

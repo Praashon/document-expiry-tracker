@@ -33,6 +33,7 @@ import { EditDocumentModal } from "@/components/dashboard/edit-document-modal";
 import { DeleteConfirmModal } from "@/components/dashboard/delete-confirm-modal";
 import { ViewDocumentModal } from "@/components/dashboard/view-document-modal";
 import { checkAuth } from "@/lib/auth-actions";
+import { AIChat } from "@/components/chat/ai-chat";
 import {
   getDocuments,
   getDocumentStatus,
@@ -624,6 +625,9 @@ export default function RemindersPage() {
         onClose={() => setIsViewModalOpen(false)}
         document={selectedDocument}
       />
+
+      {/* Floating AI Chat */}
+      <AIChat />
     </div>
   );
 }

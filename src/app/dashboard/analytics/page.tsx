@@ -26,6 +26,7 @@ import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
+import { AIChat } from "@/components/chat/ai-chat";
 
 interface DocumentStats {
   total: number;
@@ -517,6 +518,9 @@ export default function AnalyticsPage() {
           </motion.div>
         </main>
       </div>
+
+      {/* Floating AI Chat */}
+      <AIChat />
     </div>
   );
 }
