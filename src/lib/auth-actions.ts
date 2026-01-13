@@ -3,8 +3,10 @@ import { supabaseBrowser } from "./supabase-browser";
 export const registerUser = async (
   email: string,
   password: string,
-  name: string,
+  name: string
 ) => {
+  const siteUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+
   const { data, error } = await supabaseBrowser.auth.signUp({
     email,
     password,
@@ -12,6 +14,7 @@ export const registerUser = async (
       data: {
         name,
       },
+      emailRedirectTo: `${siteUrl}/auth/callback`,
     },
   });
 
@@ -94,7 +97,7 @@ export const getCurrentUser = async () => {
 };
 
 export const onAuthStateChange = (
-  callback: (event: string, session: unknown) => void,
+  callback: (event: string, session: unknown) => void
 ) => {
   return supabaseBrowser.auth.onAuthStateChange(callback);
 };
