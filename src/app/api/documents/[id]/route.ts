@@ -274,7 +274,10 @@ export async function DELETE(
       );
     }
 
-    return NextResponse.json({ message: "Document deleted successfully" });
+    return NextResponse.json({
+      success: true,
+      message: "Document deleted successfully",
+    });
   } catch (error) {
     console.error("Error deleting document:", error);
     return NextResponse.json(
