@@ -4,60 +4,7 @@ import {
   SCOPE_CHECK_PROMPT,
   OUT_OF_SCOPE_RESPONSE,
 } from "@/lib/knowledge-base";
-
-interface Message {
-  role: "user" | "assistant" | "system";
-  content: string;
-}
-
-interface OpenRouterResponse {
-  choices: {
-    message: {
-      content: string;
-    };
-  }[];
-}
-
-async function callOpenRouter(
-  messages: Message[],
-  maxTokens: number = 1024,
-): Promise<string> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-
-  if (!apiKey) {
-    throw new Error("OPENROUTER_API_KEY environment variable is not set");
-  }
-
-  const response = await fetch(
-    "https://openrouter.ai/api/v1/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-        // Recommended by OpenRouter
-        "HTTP-Referer":
-          process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-        "X-Title": "DocTracker",
-      },
-      body: JSON.stringify({
-        model: "mistralai/mistral-small-3.1-24b-instruct:free",
-        messages,
-        max_tokens: maxTokens,
-        temperature: 0.7,
-      }),
-    },
-  );
-
-  if (!response.ok) {
-    const error = await response.text();
-    console.error("OpenRouter API error:", error);
-    throw new Error(`OpenRouter API error: ${response.status}`);
-  }
-
-  const data: OpenRouterResponse = await response.json();
-  return data.choices[0]?.message?.content || "";
-}
+import { callOpenRouter, Message } from "@/lib/ai-service";
 
 async function checkScope(userMessage: string): Promise<boolean> {
   try {
@@ -68,7 +15,7 @@ async function checkScope(userMessage: string): Promise<boolean> {
           content: SCOPE_CHECK_PROMPT + userMessage,
         },
       ],
-      10,
+      10
     );
 
     return response.trim().toUpperCase().includes("IN_SCOPE");
@@ -86,7 +33,7 @@ export async function POST(request: NextRequest) {
     if (!message || typeof message !== "string") {
       return NextResponse.json(
         { error: "Message is required" },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -134,13 +81,13 @@ export async function POST(request: NextRequest) {
     ) {
       return NextResponse.json(
         { error: "AI assistant is not configured. Please set up the API key." },
-        { status: 503 },
+        { status: 503 }
       );
     }
 
     return NextResponse.json(
       { error: "Failed to process your message. Please try again." },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

@@ -37,7 +37,6 @@ export async function sendWelcomeEmail(
       html: html,
     });
 
-    console.log(`✓ Welcome email sent to ${email}`);
     return true;
   } catch (error) {
     console.error(`Failed to send welcome email to ${email}:`, error);
@@ -73,9 +72,6 @@ export async function sendExpiryReminderEmail(
       html: html,
     });
 
-    console.log(
-      `✓ Reminder email sent to ${email} for "${documentName}" (${daysUntil} days)`
-    );
     return true;
   } catch (error) {
     console.error(`Failed to send reminder email to ${email}:`, error);
@@ -284,8 +280,8 @@ function generateReminderEmailHtml(
     daysUntil === 0
       ? "TODAY"
       : daysUntil === 1
-        ? "TOMORROW"
-        : `in ${daysUntil} days`;
+      ? "TOMORROW"
+      : `in ${daysUntil} days`;
 
   return `
     <!DOCTYPE html>

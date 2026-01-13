@@ -6,8 +6,11 @@ import { ThemeProvider } from "@/components/providers/theme-provider";
 import { ToastProvider } from "@/components/ui/toast";
 
 export const metadata: Metadata = {
-  title: "Doc Exp Tracker",
-  description: "Track your document expirations",
+  title: "DocTracker - Document Expiry Management",
+  description: "Track and manage your important document expiration dates with automated email reminders",
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({

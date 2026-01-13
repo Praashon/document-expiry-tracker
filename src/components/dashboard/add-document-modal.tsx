@@ -25,6 +25,8 @@ import {
   FileCheck,
   Receipt,
   Package,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -84,6 +86,9 @@ export function AddDocumentModal({
   const [documentNumber, setDocumentNumber] = useState("");
   const [issueDate, setIssueDate] = useState("");
   const [issuingAuthority, setIssuingAuthority] = useState("");
+  const [metadata, setMetadata] = useState<{ key: string; value: string }[]>(
+    [],
+  );
 
   // OCR state
   const [ocrProcessed, setOcrProcessed] = useState(false);
@@ -102,6 +107,7 @@ export function AddDocumentModal({
     setDocumentNumber("");
     setIssueDate("");
     setIssuingAuthority("");
+    setMetadata([]);
     setError(null);
     setProcessingStatus("");
     setOcrProcessed(false);
@@ -171,6 +177,42 @@ export function AddDocumentModal({
       if (extracted.expiration_date)
         setExpirationDate(extracted.expiration_date);
 
+      // Populate metadata from AI result
+      // Populate metadata from AI result and auto-fill explicit fields
+      if (extracted.metadata) {
+        const metaEntries: { key: string; value: string }[] = [];
+
+        for (const [keyRaw, valueRaw] of Object.entries(extracted.metadata)) {
+          const keyLower = keyRaw.toLowerCase().replace(/_/g, " ");
+          const value = String(valueRaw);
+
+          if (keyLower.includes("document number") || keyLower === "number") {
+            setDocumentNumber(value);
+            continue;
+          }
+          if (keyLower.includes("issue date") || keyLower === "issued on") {
+            setIssueDate(value);
+            continue;
+          }
+          if (
+            keyLower.includes("issuing authority") ||
+            keyLower.includes("issued by") ||
+            keyLower.includes("authority")
+          ) {
+            setIssuingAuthority(value);
+            continue;
+          }
+
+          metaEntries.push({
+            key: keyRaw
+              .replace(/_/g, " ")
+              .replace(/\b\w/g, (l) => l.toUpperCase()), // Title Case
+            value,
+          });
+        }
+        setMetadata(metaEntries);
+      }
+
       setOcrProcessed(true);
       setAutomaticStep("review");
     } catch (err) {
@@ -209,6 +251,21 @@ export function AddDocumentModal({
       if (issueDate) formData.append("issue_date", issueDate);
       if (issuingAuthority.trim())
         formData.append("issuing_authority", issuingAuthority.trim());
+
+      // Send metadata as JSON string
+      if (metadata.length > 0) {
+        const metadataObj = metadata.reduce(
+          (acc, { key, value }) => {
+            if (key.trim() && value.trim()) {
+              acc[key.trim()] = value.trim();
+            }
+            return acc;
+          },
+          {} as Record<string, string>,
+        );
+        formData.append("metadata", JSON.stringify(metadataObj));
+      }
+
       if (file) formData.append("file", file);
 
       const response = await fetch("/api/documents", {
@@ -350,13 +407,12 @@ export function AddDocumentModal({
                     onDragLeave={handleDrag}
                     onDragOver={handleDrag}
                     onDrop={handleDrop}
-                    className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all ${
-                      dragActive
-                        ? "border-[#A8BBA3] bg-[#A8BBA3]/5"
-                        : file
-                          ? "border-green-500 bg-green-50 dark:bg-green-900/10"
-                          : "border-neutral-300 dark:border-neutral-700 hover:border-neutral-400 dark:hover:border-neutral-600"
-                    }`}
+                    className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all ${dragActive
+                      ? "border-[#A8BBA3] bg-[#A8BBA3]/5"
+                      : file
+                        ? "border-green-500 bg-green-50 dark:bg-green-900/10"
+                        : "border-neutral-300 dark:border-neutral-700 hover:border-neutral-400 dark:hover:border-neutral-600"
+                      }`}
                   >
                     <input
                       type="file"
@@ -418,297 +474,357 @@ export function AddDocumentModal({
               {/* Automatic Mode - Review / Manual Mode - Form */}
               {(mode === "manual" ||
                 (mode === "automatic" && automaticStep === "review")) && (
-                <div className="space-y-5">
-                  {/* Document Type Selection */}
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
-                      Document Type
-                    </label>
-                    <div className="space-y-2">
-                      {/* Expiring Documents */}
-                      <div>
-                        <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-1.5 uppercase tracking-wide">
-                          Expiring Documents
-                        </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {DOCUMENT_TYPES_BY_CATEGORY.expiring.map(
-                            (docType) => {
-                              const Icon = TYPE_ICONS[docType];
-                              const isSelected = type === docType;
-                              return (
-                                <button
-                                  key={docType}
-                                  type="button"
-                                  onClick={() => setType(docType)}
-                                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all ${
-                                    isSelected
+                  <div className="space-y-5">
+                    {/* Document Type Selection */}
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                        Document Type
+                      </label>
+                      <div className="space-y-2">
+                        {/* Expiring Documents */}
+                        <div>
+                          <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-1.5 uppercase tracking-wide">
+                            Expiring Documents
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {DOCUMENT_TYPES_BY_CATEGORY.expiring.map(
+                              (docType) => {
+                                const Icon = TYPE_ICONS[docType];
+                                const isSelected = type === docType;
+                                return (
+                                  <button
+                                    key={docType}
+                                    type="button"
+                                    onClick={() => setType(docType)}
+                                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all ${isSelected
                                       ? "bg-[#A8BBA3] text-white"
                                       : "bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700"
-                                  }`}
-                                >
-                                  <Icon className="h-3.5 w-3.5" />
-                                  {docType}
-                                </button>
-                              );
-                            },
-                          )}
+                                      }`}
+                                  >
+                                    <Icon className="h-3.5 w-3.5" />
+                                    {docType}
+                                  </button>
+                                );
+                              },
+                            )}
+                          </div>
                         </div>
-                      </div>
 
-                      {/* Identity Documents */}
-                      <div>
-                        <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-1.5 uppercase tracking-wide">
-                          Identity Documents
-                        </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {DOCUMENT_TYPES_BY_CATEGORY.identity.map(
-                            (docType) => {
-                              const Icon = TYPE_ICONS[docType];
-                              const isSelected = type === docType;
-                              return (
-                                <button
-                                  key={docType}
-                                  type="button"
-                                  onClick={() => setType(docType)}
-                                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all ${
-                                    isSelected
+                        {/* Identity Documents */}
+                        <div>
+                          <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-1.5 uppercase tracking-wide">
+                            Identity Documents
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {DOCUMENT_TYPES_BY_CATEGORY.identity.map(
+                              (docType) => {
+                                const Icon = TYPE_ICONS[docType];
+                                const isSelected = type === docType;
+                                return (
+                                  <button
+                                    key={docType}
+                                    type="button"
+                                    onClick={() => setType(docType)}
+                                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all ${isSelected
                                       ? "bg-[#A8BBA3] text-white"
                                       : "bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700"
-                                  }`}
-                                >
-                                  <Icon className="h-3.5 w-3.5" />
-                                  {docType}
-                                </button>
-                              );
-                            },
-                          )}
+                                      }`}
+                                  >
+                                    <Icon className="h-3.5 w-3.5" />
+                                    {docType}
+                                  </button>
+                                );
+                              },
+                            )}
+                          </div>
                         </div>
-                      </div>
 
-                      {/* Other */}
-                      <div className="flex flex-wrap gap-1.5">
-                        {DOCUMENT_TYPES_BY_CATEGORY.other.map((docType) => {
-                          const Icon = TYPE_ICONS[docType];
-                          const isSelected = type === docType;
-                          return (
-                            <button
-                              key={docType}
-                              type="button"
-                              onClick={() => setType(docType)}
-                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all ${
-                                isSelected
+                        {/* Other */}
+                        <div className="flex flex-wrap gap-1.5">
+                          {DOCUMENT_TYPES_BY_CATEGORY.other.map((docType) => {
+                            const Icon = TYPE_ICONS[docType];
+                            const isSelected = type === docType;
+                            return (
+                              <button
+                                key={docType}
+                                type="button"
+                                onClick={() => setType(docType)}
+                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all ${isSelected
                                   ? "bg-[#A8BBA3] text-white"
                                   : "bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700"
-                              }`}
-                            >
-                              <Icon className="h-3.5 w-3.5" />
-                              {docType}
-                            </button>
-                          );
-                        })}
+                                  }`}
+                              >
+                                <Icon className="h-3.5 w-3.5" />
+                                {docType}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Title */}
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
-                      Title *
-                    </label>
-                    <Input
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      placeholder={`e.g., My ${type}`}
-                      className="h-10"
-                    />
-                  </div>
-
-                  {/* Document Number (for identity docs) */}
-                  {config.hasDocumentNumber && (
+                    {/* Title */}
                     <div>
                       <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
-                        <Hash className="h-3.5 w-3.5 inline mr-1" />
-                        Document Number
+                        Title *
                       </label>
                       <Input
-                        value={documentNumber}
-                        onChange={(e) => setDocumentNumber(e.target.value)}
-                        placeholder="e.g., ABC123456"
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        placeholder={`e.g., My ${type}`}
                         className="h-10"
                       />
                     </div>
-                  )}
 
-                  {/* Dates Row */}
-                  <div className="grid grid-cols-2 gap-3">
+                    {/* Document Number (for identity docs) */}
                     {config.hasDocumentNumber && (
                       <div>
                         <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
-                          <Calendar className="h-3.5 w-3.5 inline mr-1" />
-                          Issue Date
+                          <Hash className="h-3.5 w-3.5 inline mr-1" />
+                          Document Number
                         </label>
                         <Input
-                          type="date"
-                          value={issueDate}
-                          onChange={(e) => setIssueDate(e.target.value)}
+                          value={documentNumber}
+                          onChange={(e) => setDocumentNumber(e.target.value)}
+                          placeholder="e.g., ABC123456"
                           className="h-10"
                         />
                       </div>
                     )}
-                    <div
-                      className={config.hasDocumentNumber ? "" : "col-span-2"}
-                    >
-                      <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
-                        <Calendar className="h-3.5 w-3.5 inline mr-1" />
-                        {config.hasExpiry
-                          ? "Expiration Date *"
-                          : "Expiration Date"}
-                      </label>
-                      <Input
-                        type="date"
-                        value={expirationDate}
-                        onChange={(e) => setExpirationDate(e.target.value)}
-                        className="h-10"
-                      />
-                    </div>
-                  </div>
 
-                  {/* Issuing Authority (for identity docs) */}
-                  {config.hasDocumentNumber && (
-                    <div>
-                      <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
-                        <Building className="h-3.5 w-3.5 inline mr-1" />
-                        Issuing Authority
-                      </label>
-                      <Input
-                        value={issuingAuthority}
-                        onChange={(e) => setIssuingAuthority(e.target.value)}
-                        placeholder="e.g., Government of Nepal"
-                        className="h-10"
-                      />
-                    </div>
-                  )}
-
-                  {/* Reminder Date */}
-                  {config.hasExpiry && (
-                    <div>
-                      <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
-                        <Calendar className="h-3.5 w-3.5 inline mr-1" />
-                        Reminder Date
-                      </label>
-                      <Input
-                        type="date"
-                        value={reminderDate}
-                        onChange={(e) => setReminderDate(e.target.value)}
-                        className="h-10"
-                      />
-                    </div>
-                  )}
-
-                  {/* Notes */}
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
-                      Notes
-                    </label>
-                    <textarea
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      placeholder="Additional details..."
-                      rows={2}
-                      className="w-full px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[#A8BBA3] resize-none text-sm"
-                    />
-                  </div>
-
-                  {/* File Upload (for manual mode or to change file) */}
-                  {(mode === "manual" || !file) && (
-                    <div>
-                      <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
-                        <Upload className="h-3.5 w-3.5 inline mr-1" />
-                        Attachment
-                      </label>
+                    {/* Dates Row */}
+                    <div className="grid grid-cols-2 gap-3">
+                      {config.hasDocumentNumber && (
+                        <div>
+                          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+                            <Calendar className="h-3.5 w-3.5 inline mr-1" />
+                            Issue Date
+                          </label>
+                          <Input
+                            type="date"
+                            value={issueDate}
+                            onChange={(e) => setIssueDate(e.target.value)}
+                            className="h-10"
+                          />
+                        </div>
+                      )}
                       <div
-                        onDragEnter={handleDrag}
-                        onDragLeave={handleDrag}
-                        onDragOver={handleDrag}
-                        onDrop={handleDrop}
-                        className={`relative border-2 border-dashed rounded-xl p-4 text-center transition-all ${
-                          dragActive
+                        className={config.hasDocumentNumber ? "" : "col-span-2"}
+                      >
+                        <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+                          <Calendar className="h-3.5 w-3.5 inline mr-1" />
+                          {config.hasExpiry
+                            ? "Expiration Date *"
+                            : "Expiration Date"}
+                        </label>
+                        <Input
+                          type="date"
+                          value={expirationDate}
+                          onChange={(e) => setExpirationDate(e.target.value)}
+                          className="h-10"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Issuing Authority (for identity docs) */}
+                    {config.hasDocumentNumber && (
+                      <div>
+                        <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+                          <Building className="h-3.5 w-3.5 inline mr-1" />
+                          Issuing Authority
+                        </label>
+                        <Input
+                          value={issuingAuthority}
+                          onChange={(e) => setIssuingAuthority(e.target.value)}
+                          placeholder="e.g., Government of Nepal"
+                          className="h-10"
+                        />
+                      </div>
+                    )}
+
+                    {/* Reminder Date */}
+                    {config.hasExpiry && (
+                      <div>
+                        <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+                          <Calendar className="h-3.5 w-3.5 inline mr-1" />
+                          Reminder Date
+                        </label>
+                        <Input
+                          type="date"
+                          value={reminderDate}
+                          onChange={(e) => setReminderDate(e.target.value)}
+                          className="h-10"
+                        />
+                      </div>
+                    )}
+
+                    {/* Notes */}
+                    <div>
+                      <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+                        Notes
+                      </label>
+                      <textarea
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        placeholder="Additional details..."
+                        rows={2}
+                        className="w-full px-3 py-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[#A8BBA3] resize-none text-sm"
+                      />
+                    </div>
+
+                    {/* Dynamic Metadata Section */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                          Additional Details
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setMetadata([...metadata, { key: "", value: "" }])
+                          }
+                          className="text-xs flex items-center gap-1 text-[#A8BBA3] hover:text-[#96ab91] font-medium transition-colors"
+                        >
+                          <Plus className="h-3 w-3" />
+                          Add Field
+                        </button>
+                      </div>
+
+                      <div className="space-y-2">
+                        {metadata.map((item, index) => (
+                          <div key={index} className="flex gap-2">
+                            <Input
+                              placeholder="Label (e.g. Blood Group)"
+                              value={item.key}
+                              onChange={(e) => {
+                                const newMeta = [...metadata];
+                                newMeta[index].key = e.target.value;
+                                setMetadata(newMeta);
+                              }}
+                              className="bg-neutral-50 dark:bg-neutral-800/50"
+                            />
+                            <Input
+                              placeholder="Value"
+                              value={item.value}
+                              onChange={(e) => {
+                                const newMeta = [...metadata];
+                                newMeta[index].value = e.target.value;
+                                setMetadata(newMeta);
+                              }}
+                              className="bg-neutral-50 dark:bg-neutral-800/50"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newMeta = metadata.filter(
+                                  (_, i) => i !== index,
+                                );
+                                setMetadata(newMeta);
+                              }}
+                              className="p-2 text-neutral-400 hover:text-red-500 transition-colors"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ))}
+                        {metadata.length === 0 && (
+                          <p className="text-xs text-neutral-500 italic px-1">
+                            No additional details. Click "Add Field" to add custom
+                            data.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* File Upload (for manual mode or to change file) */}
+                    {(mode === "manual" || !file) && (
+                      <div>
+                        <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+                          <Upload className="h-3.5 w-3.5 inline mr-1" />
+                          Attachment
+                        </label>
+                        <div
+                          onDragEnter={handleDrag}
+                          onDragLeave={handleDrag}
+                          onDragOver={handleDrag}
+                          onDrop={handleDrop}
+                          className={`relative border-2 border-dashed rounded-xl p-4 text-center transition-all ${dragActive
                             ? "border-[#A8BBA3] bg-[#A8BBA3]/5"
                             : file
                               ? "border-green-500 bg-green-50 dark:bg-green-900/10"
                               : "border-neutral-300 dark:border-neutral-700"
-                        }`}
-                      >
-                        <input
-                          type="file"
-                          onChange={handleFileChange}
-                          accept="image/*,.pdf"
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                        />
-                        {file ? (
-                          <div className="flex items-center justify-center gap-2">
-                            <CheckCircle className="h-4 w-4 text-green-500" />
-                            <span className="text-sm text-neutral-700 dark:text-neutral-300">
-                              {file.name}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setFile(null);
-                              }}
-                              className="p-1 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded"
-                            >
-                              <X className="h-3.5 w-3.5 text-neutral-500" />
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-center gap-2 text-neutral-500">
-                            <Upload className="h-4 w-4" />
-                            <span className="text-sm">
-                              Drop file or click to upload
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Show attached file info in review mode */}
-                  {mode === "automatic" &&
-                    automaticStep === "review" &&
-                    file && (
-                      <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/10 rounded-lg text-sm">
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                        <span className="text-neutral-700 dark:text-neutral-300">
-                          {file.name}
-                        </span>
+                            }`}
+                        >
+                          <input
+                            type="file"
+                            onChange={handleFileChange}
+                            accept="image/*,.pdf"
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          />
+                          {file ? (
+                            <div className="flex items-center justify-center gap-2">
+                              <CheckCircle className="h-4 w-4 text-green-500" />
+                              <span className="text-sm text-neutral-700 dark:text-neutral-300">
+                                {file.name}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setFile(null);
+                                }}
+                                className="p-1 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded"
+                              >
+                                <X className="h-3.5 w-3.5 text-neutral-500" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-center gap-2 text-neutral-500">
+                              <Upload className="h-4 w-4" />
+                              <span className="text-sm">
+                                Drop file or click to upload
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
-                </div>
-              )}
+
+                    {/* Show attached file info in review mode */}
+                    {mode === "automatic" &&
+                      automaticStep === "review" &&
+                      file && (
+                        <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-900/10 rounded-lg text-sm">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          <span className="text-neutral-700 dark:text-neutral-300">
+                            {file.name}
+                          </span>
+                        </div>
+                      )}
+                  </div>
+                )}
             </div>
 
             {/* Footer */}
             {(mode === "manual" ||
               (mode === "automatic" && automaticStep === "review")) && (
-              <div className="flex justify-end gap-3 p-5 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50">
-                <Button variant="outline" onClick={handleClose}>
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleSubmit}
-                  disabled={isLoading}
-                  className="bg-[#A8BBA3] hover:bg-[#96ab91] text-white min-w-[100px]"
-                >
-                  {isLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    "Save Document"
-                  )}
-                </Button>
-              </div>
-            )}
+                <div className="flex justify-end gap-3 p-5 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50">
+                  <Button variant="outline" onClick={handleClose}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={isLoading}
+                    className="bg-[#A8BBA3] hover:bg-[#96ab91] text-white min-w-[100px]"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      "Save Document"
+                    )}
+                  </Button>
+                </div>
+              )}
           </motion.div>
         </div>
       )}

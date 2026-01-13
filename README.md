@@ -1,36 +1,224 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DocTracker
 
-## Getting Started
+**Never miss a document renewal deadline again.** DocTracker is a smart document expiration management system that automatically tracks your important documents and sends timely email reminders before they expire. Built specifically for individuals and businesses who need to stay on top of passport renewals, license expirations, insurance policies, and more.
 
-First, run the development server:
+---
+
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Next.js](https://img.shields.io/badge/Next.js-16-black)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-38B2AC)
+![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
+
+---
+
+## Tech Stack
+
+| Layer      | Technology                                        |
+| ---------- | ------------------------------------------------- |
+| Frontend   | Next.js 16, React 19, TypeScript, Tailwind CSS 4  |
+| Backend    | Next.js API Routes, Nodemailer                    |
+| Database   | Supabase (PostgreSQL)                             |
+| Auth       | Supabase Auth (Email/Password, Google OAuth, 2FA) |
+| OCR        | Tesseract.js                                      |
+| Animations | Framer Motion                                     |
+| DevOps     | Vercel, Vercel Cron Jobs                          |
+
+---
+
+## Key Features
+
+- **Automated Email Reminders** - Receive notifications at 30, 15, 7, and 1 day before document expiration
+- **Customizable Notification Schedule** - Configure which reminder intervals work best for you
+- **OCR Document Scanning** - Automatically extract text and dates from uploaded document images
+- **Secure Document Storage** - Upload and store document copies with Supabase Storage
+- **Two-Factor Authentication** - Optional TOTP-based 2FA for enhanced account security
+- **Dark Mode Support** - Full light and dark theme with system preference detection
+- **Document Analytics** - Visual insights into your document portfolio and expiration trends
+- **AI Assistant** - Built-in chat assistant to help with document-related questions
+
+---
+
+## Prerequisites
+
+Before you begin, ensure you have the following:
+
+- Node.js 18 or higher
+- npm or yarn package manager
+- A [Supabase](https://supabase.com) project
+- Gmail account with [App Password](https://support.google.com/accounts/answer/185833) enabled
+
+---
+
+## Installation
+
+1. **Clone the repository**
+
+   ```bash
+   git clone https://github.com/yourusername/doc-exp-tracker.git
+   cd doc-exp-tracker
+   ```
+
+2. **Install dependencies**
+
+   ```bash
+   npm install
+   ```
+
+3. **Configure environment variables**
+
+   Copy the example environment file and fill in your values:
+
+   ```bash
+   cp .env.example .env.local
+   ```
+
+   Required variables:
+
+   | Variable                        | Description                        |
+   | ------------------------------- | ---------------------------------- |
+   | `NEXT_PUBLIC_SUPABASE_URL`      | Your Supabase project URL          |
+   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous key             |
+   | `SUPABASE_SERVICE_ROLE_KEY`     | Supabase service role key          |
+   | `GMAIL_USER`                    | Gmail address for sending emails   |
+   | `GMAIL_APP_PASSWORD`            | Gmail App Password (16 characters) |
+   | `NEXT_PUBLIC_APP_URL`           | Your application URL               |
+   | `CRON_SECRET`                   | Secret key for cron job auth       |
+
+4. **Set up the database**
+
+   Run the SQL scripts in your Supabase SQL Editor:
+
+   ```bash
+   # Execute the storage setup script
+   supabase-storage-setup.sql
+   ```
+
+---
+
+## Usage
+
+### Development Server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Production Build
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build
+npm run start
+```
 
-## Learn More
+### Linting
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run lint
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Project Structure
 
-## Deploy on Vercel
+```
+doc-exp-tracker/
+|-- public/                     # Static assets
+|-- src/
+|   |-- app/                    # Next.js App Router
+|   |   |-- api/                # API routes
+|   |   |   |-- 2fa/            # Two-factor authentication
+|   |   |   |-- chat/           # AI chat endpoint
+|   |   |   |-- documents/      # Document CRUD operations
+|   |   |   |-- notifications/  # Email notification system
+|   |   |   |-- ocr/            # OCR processing
+|   |   |   +-- welcome/        # Welcome email endpoint
+|   |   |-- auth/               # Auth callback handler
+|   |   |-- dashboard/          # Protected dashboard pages
+|   |   |-- login/              # Login page
+|   |   +-- register/           # Registration page
+|   |-- components/
+|   |   |-- chat/               # AI chat component
+|   |   |-- dashboard/          # Dashboard components
+|   |   |-- layout/             # Layout components
+|   |   |-- providers/          # Context providers
+|   |   +-- ui/                 # Reusable UI components
+|   |-- hooks/                  # Custom React hooks
+|   +-- lib/                    # Utilities and configurations
+|       |-- supabase.ts         # Supabase client setup
+|       |-- email.ts            # Email utilities
+|       |-- ocr.ts              # OCR processing utilities
+|       +-- document-actions.ts # Document CRUD functions
+|-- supabase/                   # Supabase configuration
+|-- .env.example                # Environment variable template
+|-- package.json
+|-- tsconfig.json
++-- vercel.json                 # Vercel deployment config
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Notification Schedule
+
+DocTracker sends automated email reminders based on configurable intervals:
+
+| Days Before | Alert Level    | Description                       |
+| ----------- | -------------- | --------------------------------- |
+| 30 days     | Advance Notice | Early heads-up for planning       |
+| 15 days     | Reminder       | Time to start the renewal process |
+| 7 days      | Warning        | Renewal becoming urgent           |
+| 1 day       | Critical       | Final reminder before expiry      |
+
+Notifications are triggered daily via Vercel cron jobs. Users can customize their preferred intervals in the Settings page.
+
+---
+
+## Deployment
+
+### Vercel (Recommended)
+
+1. Push your code to a GitHub repository
+2. Import the project in [Vercel](https://vercel.com)
+3. Add all environment variables in the Vercel dashboard
+4. Deploy
+
+The `vercel.json` file includes cron job configuration for automated daily notifications at 8:00 AM UTC.
+
+### Supabase Setup
+
+Ensure your Supabase project has:
+
+- Row Level Security (RLS) policies for the `documents` table
+- Storage buckets for document uploads and user avatars
+- Email and Google OAuth authentication providers enabled
+
+---
+
+## Contributing
+
+Contributions are welcome! Here's how you can help:
+
+1. **Fork the repository**
+2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
+3. **Commit your changes**: `git commit -m 'Add amazing feature'`
+4. **Push to the branch**: `git push origin feature/amazing-feature`
+5. **Open a Pull Request**
+
+Please ensure your code follows the existing style and passes linting.
+
+---
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+---
+
+## Acknowledgments
+
+- Built with [Next.js](https://nextjs.org/)
+- Database and authentication by [Supabase](https://supabase.com/)
+- OCR powered by [Tesseract.js](https://tesseract.projectnaptha.com/)
+- Animations by [Framer Motion](https://www.framer.com/motion/)

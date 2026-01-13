@@ -48,6 +48,7 @@ export interface Document {
   document_number?: string | null;
   issue_date?: string | null;
   issuing_authority?: string | null;
+  metadata?: Record<string, any> | null;
   user_id: string;
   created_at?: string;
   updated_at?: string;

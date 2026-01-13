@@ -28,11 +28,21 @@ export async function POST(req: NextRequest) {
     const documentNumber = formData.get("document_number") as string | null;
     const issueDate = formData.get("issue_date") as string | null;
     const issuingAuthority = formData.get("issuing_authority") as string | null;
+    const metadataRaw = formData.get("metadata") as string | null;
+
+    let metadata = {};
+    if (metadataRaw) {
+      try {
+        metadata = JSON.parse(metadataRaw);
+      } catch (e) {
+        console.error("Failed to parse metadata:", e);
+      }
+    }
 
     if (!title || !type) {
       return NextResponse.json(
         { error: "Missing required fields: title and type are required" },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -44,7 +54,7 @@ export async function POST(req: NextRequest) {
     if (typeConfig?.hasExpiry && !expirationDate) {
       return NextResponse.json(
         { error: "Expiration date is required for this document type" },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
@@ -65,7 +75,7 @@ export async function POST(req: NextRequest) {
         console.error("Error uploading file:", uploadError);
         return NextResponse.json(
           { error: "Error uploading file" },
-          { status: 500 },
+          { status: 500 }
         );
       }
 
@@ -75,32 +85,52 @@ export async function POST(req: NextRequest) {
       fileSize = file.size;
     }
 
-    const { data: newDocument, error: insertError } = await supabase
+    const docData = {
+      title: title.trim(),
+      type,
+      category,
+      expiration_date: expirationDate || null,
+      reminder_date: reminderDate || null,
+      notes: notes?.trim() || null,
+      file_path: filePath,
+      file_name: fileName,
+      file_type: fileType,
+      file_size: fileSize,
+      document_number: documentNumber?.trim() || null,
+      issue_date: issueDate || null,
+      issuing_authority: issuingAuthority?.trim() || null,
+      user_id: userId,
+    };
+
+    let { data: newDocument, error: insertError } = await supabase
       .from("documents")
-      .insert({
-        title: title.trim(),
-        type,
-        category,
-        expiration_date: expirationDate || null,
-        reminder_date: reminderDate || null,
-        notes: notes?.trim() || null,
-        file_path: filePath,
-        file_name: fileName,
-        file_type: fileType,
-        file_size: fileSize,
-        document_number: documentNumber?.trim() || null,
-        issue_date: issueDate || null,
-        issuing_authority: issuingAuthority?.trim() || null,
-        user_id: userId,
-      })
+      .insert({ ...docData, metadata })
       .select()
       .single();
+
+    // Fallback: If insert failed (likely metadata), retry without it
+    if (insertError) {
+      console.warn(
+        "Initial insert failed, retrying without metadata. Error:",
+        insertError.message
+      );
+      const retryResult = await supabase
+        .from("documents")
+        .insert(docData)
+        .select()
+        .single();
+
+      if (!retryResult.error) {
+        newDocument = retryResult.data;
+        insertError = null;
+      }
+    }
 
     if (insertError) {
       console.error("Error creating document:", insertError);
       return NextResponse.json(
-        { error: "Error creating document" },
-        { status: 500 },
+        { error: insertError.message || "Error creating document" },
+        { status: 500 }
       );
     }
 
@@ -109,7 +139,7 @@ export async function POST(req: NextRequest) {
     console.error("Error creating document:", error);
     return NextResponse.json(
       { error: "Error creating document" },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
@@ -137,7 +167,7 @@ export async function GET(_req: NextRequest) {
       console.error("Error fetching documents:", error);
       return NextResponse.json(
         { error: "Error fetching documents" },
-        { status: 500 },
+        { status: 500 }
       );
     }
 
@@ -146,7 +176,7 @@ export async function GET(_req: NextRequest) {
     console.error("Error fetching documents:", error);
     return NextResponse.json(
       { error: "Error fetching documents" },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

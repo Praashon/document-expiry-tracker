@@ -41,6 +41,8 @@ import { Header } from "@/components/layout/header";
 import { Sidebar } from "@/components/layout/sidebar";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
+import { AIChat } from "@/components/chat/ai-chat";
+import { AvatarCropModal } from "@/components/dashboard/avatar-crop-modal";
 
 interface ProfileData {
   email: string;
@@ -129,13 +131,12 @@ function PasswordStrengthIndicator({
             Password Strength
           </span>
           <span
-            className={`font-medium ${
-              strengthPercent <= 40
+            className={`font-medium ${strengthPercent <= 40
                 ? "text-red-500"
                 : strengthPercent <= 60
                   ? "text-yellow-500"
                   : "text-green-500"
-            }`}
+              }`}
           >
             {getStrengthLabel()}
           </span>
@@ -158,16 +159,15 @@ function PasswordStrengthIndicator({
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: index * 0.05 }}
-            className={`flex items-center gap-2 text-xs ${
-              req.passed
+            className={`flex items-center gap-2 text-xs ${req.passed
                 ? "text-green-600 dark:text-green-400"
                 : "text-neutral-400 dark:text-neutral-500"
-            }`}
+              }`}
           >
             {req.passed ? (
-              <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0" />
+              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
             ) : (
-              <X className="h-3.5 w-3.5 flex-shrink-0" />
+              <X className="h-3.5 w-3.5 shrink-0" />
             )}
             <span>{req.label}</span>
           </motion.div>
@@ -178,16 +178,15 @@ function PasswordStrengthIndicator({
           <motion.div
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
-            className={`flex items-center gap-2 text-xs mt-1 ${
-              passwordsMatch
+            className={`flex items-center gap-2 text-xs mt-1 ${passwordsMatch
                 ? "text-green-600 dark:text-green-400"
                 : "text-red-500 dark:text-red-400"
-            }`}
+              }`}
           >
             {passwordsMatch ? (
-              <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0" />
+              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
             ) : (
-              <X className="h-3.5 w-3.5 flex-shrink-0" />
+              <X className="h-3.5 w-3.5 shrink-0" />
             )}
             <span>
               {passwordsMatch ? "Passwords match" : "Passwords do not match"}
@@ -212,6 +211,10 @@ function ProfilePageContent() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [totpSecret, setTotpSecret] = useState<string | null>(null);
+
+  // Avatar crop modal state
+  const [showCropModal, setShowCropModal] = useState(false);
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
 
   const [showPasswords, setShowPasswords] = useState({
     current: false,
@@ -240,6 +243,9 @@ function ProfilePageContent() {
 
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [desktopNotifications, setDesktopNotifications] = useState(false);
+  const [notificationIntervals, setNotificationIntervals] = useState<number[]>([
+    30, 15, 7, 1,
+  ]);
 
   const [message, setMessage] = useState<{
     type: "success" | "error";
@@ -380,6 +386,16 @@ function ProfilePageContent() {
       setDesktopNotifications(
         user.user_metadata?.desktop_notifications || false,
       );
+
+      // Load custom notification intervals or use defaults
+      if (
+        user.user_metadata?.notification_intervals &&
+        Array.isArray(user.user_metadata.notification_intervals)
+      ) {
+        setNotificationIntervals(user.user_metadata.notification_intervals);
+      } else {
+        setNotificationIntervals([30, 15, 7, 1]);
+      }
 
       if (user.user_metadata?.backup_codes) {
         setBackupCodes(user.user_metadata.backup_codes);
@@ -667,22 +683,43 @@ function ProfilePageContent() {
     setMessage({ type: "success", text: "Backup codes copied to clipboard" });
   };
 
-  const handleAvatarUpload = async (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
+  const handleAvatarSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      setMessage({ type: "error", text: "Please select an image file" });
+      return;
+    }
+
+    // Validate file size (max 10MB for cropping)
+    if (file.size > 10 * 1024 * 1024) {
+      setMessage({ type: "error", text: "Image must be less than 10MB" });
+      return;
+    }
+
+    setSelectedImageFile(file);
+    setShowCropModal(true);
+
+    // Reset input so the same file can be selected again
+    event.target.value = "";
+  };
+
+  const handleCroppedAvatar = async (croppedBlob: Blob) => {
     try {
       setIsSaving(true);
+      setShowCropModal(false);
 
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${user?.id}-${Date.now()}.${fileExt}`;
+      const fileName = `${user?.id}-${Date.now()}.jpg`;
 
-      // Try to upload, if bucket doesn't exist show helpful message
+      // Upload the cropped image
       const { error } = await supabase.storage
         .from("avatars")
-        .upload(fileName, file, { upsert: true });
+        .upload(fileName, croppedBlob, {
+          upsert: true,
+          contentType: "image/jpeg",
+        });
 
       if (error) {
         if (
@@ -700,11 +737,28 @@ function ProfilePageContent() {
         data: { publicUrl },
       } = supabase.storage.from("avatars").getPublicUrl(fileName);
 
-      await handleProfileUpdate("avatar_url", publicUrl);
+      // Add cache buster to force refresh
+      const urlWithCacheBuster = `${publicUrl}?t=${Date.now()}`;
+
+      // Update profile in database
+      await supabase.auth.updateUser({
+        data: { avatar_url: urlWithCacheBuster },
+      });
+
+      // Update local state immediately for instant feedback
+      setProfileData((prev) =>
+        prev ? { ...prev, avatar_url: urlWithCacheBuster } : null,
+      );
+
+      // Refresh user context
+      await refreshUser();
+
+      setMessage({ type: "success", text: "Avatar updated successfully!" });
     } catch (error: any) {
       setMessage({ type: "error", text: error.message });
     } finally {
       setIsSaving(false);
+      setSelectedImageFile(null);
     }
   };
 
@@ -751,11 +805,10 @@ function ProfilePageContent() {
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className={`mb-6 p-4 rounded-lg border ${
-                message.type === "success"
+              className={`mb-6 p-4 rounded-lg border ${message.type === "success"
                   ? "bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400"
                   : "bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400"
-              }`}
+                }`}
             >
               <div className="flex items-center gap-2">
                 {message.type === "success" ? (
@@ -799,7 +852,7 @@ function ProfilePageContent() {
                           referrerPolicy="no-referrer"
                         />
                       ) : (
-                        <div className="h-20 w-20 rounded-full bg-gradient-to-tr from-[#A8BBA3] to-[#8FA58F] flex items-center justify-center text-white text-xl font-bold">
+                        <div className="h-20 w-20 rounded-full bg-linear-to-tr from-[#A8BBA3] to-[#8FA58F] flex items-center justify-center text-white text-xl font-bold">
                           {profileData?.name.charAt(0).toUpperCase()}
                         </div>
                       )}
@@ -809,7 +862,7 @@ function ProfilePageContent() {
                           type="file"
                           accept="image/*"
                           className="hidden"
-                          onChange={handleAvatarUpload}
+                          onChange={handleAvatarSelect}
                           disabled={isSaving}
                         />
                       </label>
@@ -879,21 +932,21 @@ function ProfilePageContent() {
                         <p className="text-xs text-neutral-500">
                           {profileData?.created_at
                             ? new Date(
-                                profileData.created_at,
-                              ).toLocaleDateString("en-US", {
-                                year: "numeric",
-                                month: "long",
-                                day: "numeric",
-                              })
+                              profileData.created_at,
+                            ).toLocaleDateString("en-US", {
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                            })
                             : user?.created_at
                               ? new Date(user.created_at).toLocaleDateString(
-                                  "en-US",
-                                  {
-                                    year: "numeric",
-                                    month: "long",
-                                    day: "numeric",
-                                  },
-                                )
+                                "en-US",
+                                {
+                                  year: "numeric",
+                                  month: "long",
+                                  day: "numeric",
+                                },
+                              )
                               : "Unknown"}
                         </p>
                       </div>
@@ -1456,6 +1509,105 @@ function ProfilePageContent() {
                 </CardContent>
               </Card>
 
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/20">
+                      <Mail className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    Notification Schedule
+                  </CardTitle>
+                  <CardDescription>
+                    Choose when to receive email reminders before document
+                    expiry
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {[
+                      {
+                        days: 30,
+                        label: "1 Month Before",
+                        description: "Advance notice",
+                      },
+                      {
+                        days: 15,
+                        label: "15 Days Before",
+                        description: "Early reminder",
+                      },
+                      {
+                        days: 7,
+                        label: "1 Week Before",
+                        description: "Standard reminder",
+                      },
+                      {
+                        days: 1,
+                        label: "1 Day Before",
+                        description: "Final reminder",
+                      },
+                    ].map((interval) => (
+                      <div
+                        key={interval.days}
+                        className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${notificationIntervals.includes(interval.days)
+                            ? "bg-[#A8BBA3]/10 border-[#A8BBA3] dark:bg-[#A8BBA3]/5"
+                            : "bg-neutral-50 border-neutral-200 dark:bg-neutral-800/50 dark:border-neutral-700"
+                          }`}
+                      >
+                        <div className="flex-1">
+                          <p className="font-medium text-neutral-900 dark:text-white">
+                            {interval.label}
+                          </p>
+                          <p className="text-sm text-neutral-500">
+                            {interval.description}
+                          </p>
+                        </div>
+                        <Switch
+                          checked={notificationIntervals.includes(
+                            interval.days,
+                          )}
+                          onCheckedChange={async (checked) => {
+                            let newIntervals: number[];
+                            if (checked) {
+                              newIntervals = [
+                                ...notificationIntervals,
+                                interval.days,
+                              ].sort((a, b) => b - a);
+                            } else {
+                              newIntervals = notificationIntervals.filter(
+                                (d) => d !== interval.days,
+                              );
+                            }
+                            setNotificationIntervals(newIntervals);
+                            await supabase.auth.updateUser({
+                              data: { notification_intervals: newIntervals },
+                            });
+                            setMessage({
+                              type: "success",
+                              text: checked
+                                ? `Added ${interval.label.toLowerCase()} reminder`
+                                : `Removed ${interval.label.toLowerCase()} reminder`,
+                            });
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="p-4 bg-neutral-50 dark:bg-neutral-800/50 rounded-lg border border-neutral-200 dark:border-neutral-700">
+                    <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                      <strong>Note:</strong> Reminders are sent daily at 8:00 AM
+                      for documents expiring on the selected intervals.
+                      {notificationIntervals.length === 0 && (
+                        <span className="text-amber-600 dark:text-amber-400 block mt-2">
+                          ⚠️ You have disabled all reminders. Enable at least
+                          one interval to receive expiry notifications.
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
               <Card className="border-red-200 dark:border-red-800">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-3 text-red-600 dark:text-red-400">
@@ -1595,6 +1747,21 @@ function ProfilePageContent() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Avatar Crop Modal */}
+      {selectedImageFile && (
+        <AvatarCropModal
+          isOpen={showCropModal}
+          onClose={() => {
+            setShowCropModal(false);
+            setSelectedImageFile(null);
+          }}
+          imageFile={selectedImageFile}
+          onCropComplete={handleCroppedAvatar}
+        />
+      )}
+
+      <AIChat />
     </div>
   );
 }

@@ -21,6 +21,20 @@ import {
   Bookmark,
   FileCheck,
   Package,
+  Info,
+  User,
+  MapPin,
+  Droplet,
+  Flag,
+  Cake,
+  Phone,
+  Mail,
+  Briefcase,
+  Ruler,
+  Eye,
+  Users,
+  BadgeCheck,
+  Car as CarIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Document, DocumentType, DocumentStatus } from "@/lib/supabase";
@@ -159,7 +173,7 @@ export function ViewDocumentModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ duration: 0.2 }}
-            className="relative w-full max-w-md bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl overflow-hidden"
+            className="relative w-full max-w-md max-h-[90vh] bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
           >
             {/* Header */}
             <div
@@ -210,7 +224,7 @@ export function ViewDocumentModal({
             </div>
 
             {/* Content */}
-            <div className="p-5 space-y-4">
+            <div className="p-5 space-y-4 overflow-y-auto flex-1">
               {/* Document Number */}
               {document.document_number && (
                 <div className="flex items-center gap-3">
@@ -297,6 +311,120 @@ export function ViewDocumentModal({
                   </p>
                 </div>
               )}
+
+              {/* Additional Details from Metadata */}
+              {document.metadata &&
+                Object.keys(document.metadata).length > 0 && (
+                  <div className="pt-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Info className="h-4 w-4 text-[#A8BBA3]" />
+                      <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                        Additional Details
+                      </p>
+                    </div>
+                    <div className="bg-neutral-50 dark:bg-neutral-800 rounded-lg p-4 space-y-3">
+                      {Object.entries(document.metadata).map(([key, value]) => {
+                        if (!value) return null;
+
+                        // Determine icon based on key
+                        const keyLower = key.toLowerCase();
+                        let IconComponent: React.ElementType = Info;
+                        if (
+                          keyLower.includes("name") ||
+                          keyLower.includes("holder")
+                        ) {
+                          IconComponent = User;
+                        } else if (
+                          keyLower.includes("birth") ||
+                          keyLower.includes("dob") ||
+                          keyLower.includes("age")
+                        ) {
+                          IconComponent = Cake;
+                        } else if (
+                          keyLower.includes("address") ||
+                          keyLower.includes("place") ||
+                          keyLower.includes("location") ||
+                          keyLower.includes("district") ||
+                          keyLower.includes("city") ||
+                          keyLower.includes("ward")
+                        ) {
+                          IconComponent = MapPin;
+                        } else if (keyLower.includes("blood")) {
+                          IconComponent = Droplet;
+                        } else if (
+                          keyLower.includes("national") ||
+                          keyLower.includes("country") ||
+                          keyLower.includes("citizenship")
+                        ) {
+                          IconComponent = Flag;
+                        } else if (keyLower.includes("date")) {
+                          IconComponent = Calendar;
+                        } else if (
+                          keyLower.includes("phone") ||
+                          keyLower.includes("mobile") ||
+                          keyLower.includes("contact")
+                        ) {
+                          IconComponent = Phone;
+                        } else if (keyLower.includes("email")) {
+                          IconComponent = Mail;
+                        } else if (
+                          keyLower.includes("occupation") ||
+                          keyLower.includes("profession") ||
+                          keyLower.includes("employer")
+                        ) {
+                          IconComponent = Briefcase;
+                        } else if (keyLower.includes("height")) {
+                          IconComponent = Ruler;
+                        } else if (
+                          keyLower.includes("eye") ||
+                          keyLower.includes("color") ||
+                          keyLower.includes("complexion")
+                        ) {
+                          IconComponent = Eye;
+                        } else if (
+                          keyLower.includes("father") ||
+                          keyLower.includes("mother") ||
+                          keyLower.includes("spouse") ||
+                          keyLower.includes("family")
+                        ) {
+                          IconComponent = Users;
+                        } else if (
+                          keyLower.includes("gender") ||
+                          keyLower.includes("sex")
+                        ) {
+                          IconComponent = BadgeCheck;
+                        } else if (
+                          keyLower.includes("vehicle") ||
+                          keyLower.includes("license_class") ||
+                          keyLower.includes("category")
+                        ) {
+                          IconComponent = CarIcon;
+                        }
+
+                        // Format the key for display
+                        const displayKey = key
+                          .replace(/_/g, " ")
+                          .replace(/\b\w/g, (l) => l.toUpperCase());
+
+                        return (
+                          <div key={key} className="flex items-start gap-3">
+                            <div className="p-1.5 rounded-md bg-white dark:bg-neutral-700 shrink-0">
+                              <IconComponent className="h-3.5 w-3.5 text-neutral-500" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs text-neutral-500">
+                                {displayKey}
+                              </p>
+                              <p className="text-sm font-medium text-neutral-900 dark:text-white break-words">
+                                {String(value)}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
               {/* Attached File */}
               {document.file_name && (

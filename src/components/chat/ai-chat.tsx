@@ -12,6 +12,10 @@ import {
   Sparkles,
   AlertCircle,
   RefreshCw,
+  Clock,
+  Trash2,
+  ChevronLeft,
+  MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -19,9 +23,16 @@ interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
-  timestamp: Date;
+  timestamp: Date | string; // Allow string for hydration
   isOutOfScope?: boolean;
   isError?: boolean;
+}
+
+interface ChatSession {
+  id: string;
+  title: string;
+  date: string; // ISO string
+  messages: Message[];
 }
 
 interface AIChatProps {
@@ -49,6 +60,8 @@ export function AIChat({
   const setIsOpen = onToggle || setInternalIsOpen;
 
   const [messages, setMessages] = useState<Message[]>([]);
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isConfigured, setIsConfigured] = useState<boolean | null>(null);
@@ -56,7 +69,6 @@ export function AIChat({
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    // Check if the AI is configured
     fetch("/api/chat")
       .then((res) => res.json())
       .then((data) => {
@@ -65,19 +77,69 @@ export function AIChat({
       .catch(() => {
         setIsConfigured(false);
       });
+
+    // Load history
+    const saved = localStorage.getItem("doc_tracker_chat_history");
+    if (saved) {
+      try {
+        setSessions(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to parse chat history");
+      }
+    }
   }, []);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    if (sessions.length > 0) {
+      localStorage.setItem("doc_tracker_chat_history", JSON.stringify(sessions));
+    }
+  }, [sessions]);
 
   useEffect(() => {
-    if (isOpen && inputRef.current) {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, showHistory]);
+
+  useEffect(() => {
+    if (isOpen && !showHistory && inputRef.current) {
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [isOpen]);
+  }, [isOpen, showHistory]);
 
   const generateId = () => Math.random().toString(36).substring(2, 15);
+
+  const saveCurrentSession = () => {
+    if (messages.length === 0) return;
+
+    const newSession: ChatSession = {
+      id: generateId(),
+      title: messages[0].content.slice(0, 30) + (messages[0].content.length > 30 ? "..." : ""),
+      date: new Date().toISOString(),
+      messages: messages,
+    };
+
+    setSessions((prev) => [newSession, ...prev]);
+  };
+
+  const startNewChat = () => {
+    if (messages.length > 0) {
+      saveCurrentSession();
+    }
+    setMessages([]);
+    setShowHistory(false);
+  };
+
+  const loadSession = (session: ChatSession) => {
+    setMessages(session.messages);
+    setShowHistory(false);
+  };
+
+  const deleteSession = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setSessions((prev) => prev.filter((s) => s.id !== id));
+    if (sessions.length === 1) {
+      localStorage.removeItem("doc_tracker_chat_history");
+    }
+  };
 
   const sendMessage = async (content: string) => {
     if (!content.trim() || isLoading) return;
@@ -150,42 +212,69 @@ export function AIChat({
     sendMessage(question);
   };
 
-  const clearChat = () => {
-    setMessages([]);
+  const formatTime = (date: Date | string) => {
+    return new Date(date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString([], { month: "short", day: "numeric" });
   };
 
   const chatContent = (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-white dark:bg-neutral-900">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-neutral-200 dark:border-neutral-800 bg-gradient-to-r from-[#A8BBA3]/10 to-transparent">
+      <div className="flex items-center justify-between p-4 border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-10">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-full bg-[#A8BBA3]/20">
-            <Sparkles className="h-5 w-5 text-[#A8BBA3]" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-neutral-900 dark:text-white">
-              DocTracker Assistant
-            </h3>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400">
-              Ask me anything about the app
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {messages.length > 0 && (
+          {showHistory ? (
             <Button
               variant="ghost"
               size="sm"
-              onClick={clearChat}
-              className="h-8 w-8 p-0 text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
-              title="Clear chat"
+              onClick={() => setShowHistory(false)}
+              className="-ml-2 h-8 w-8 p-0"
             >
-              <RefreshCw className="h-4 w-4" />
+              <ChevronLeft className="h-5 w-5" />
             </Button>
+          ) : (
+            <div className="p-2 rounded-full bg-[#A8BBA3]/20">
+              <Sparkles className="h-5 w-5 text-[#A8BBA3]" />
+            </div>
+          )}
+          <div>
+            <h3 className="font-semibold text-neutral-900 dark:text-white">
+              {showHistory ? "Chat History" : "DocTracker Assistant"}
+            </h3>
+            {!showHistory && (
+              <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                Ask me anything about the app
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-1">
+          {!showHistory && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  if (messages.length > 0) saveCurrentSession();
+                  setShowHistory(true);
+                }}
+                className="h-8 w-8 p-0 text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
+                title="History"
+              >
+                <Clock className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={startNewChat}
+                className="h-8 w-8 p-0 text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
+                title="New Chat"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            </>
           )}
           {floating && (
             <Button
@@ -200,156 +289,193 @@ export function AIChat({
         </div>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {!isConfigured && isConfigured !== null && (
-          <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-amber-700 dark:text-amber-400 text-sm">
-            <AlertCircle className="h-4 w-4 flex-shrink-0" />
-            <span>
-              AI Assistant is not configured. Please add OPENROUTER_API_KEY to
-              your environment variables.
-            </span>
-          </div>
-        )}
-
-        {messages.length === 0 && isConfigured && (
-          <div className="text-center py-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#A8BBA3]/10 mb-4">
-              <Bot className="h-8 w-8 text-[#A8BBA3]" />
+      {showHistory ? (
+        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+          {sessions.length === 0 ? (
+            <div className="text-center py-12 text-neutral-500">
+              <Clock className="h-12 w-12 mx-auto mb-3 opacity-30" />
+              <p>No chat history yet</p>
             </div>
-            <h4 className="text-lg font-medium text-neutral-900 dark:text-white mb-2">
-              How can I help you?
-            </h4>
-            <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-6 max-w-xs mx-auto">
-              Ask me anything about DocTracker - managing documents, settings,
-              security, and more.
-            </p>
-
-            {/* Suggested questions */}
-            <div className="space-y-2">
-              <p className="text-xs text-neutral-400 dark:text-neutral-500 uppercase tracking-wider">
-                Suggested questions
-              </p>
-              <div className="flex flex-wrap gap-2 justify-center">
-                {SUGGESTED_QUESTIONS.map((question, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleSuggestedQuestion(question)}
-                    className="px-3 py-1.5 text-xs bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded-full transition-colors"
-                  >
-                    {question}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        <AnimatePresence mode="popLayout">
-          {messages.map((message) => (
-            <motion.div
-              key={message.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-              className={`flex gap-3 ${
-                message.role === "user" ? "flex-row-reverse" : ""
-              }`}
-            >
+          ) : (
+            sessions.map((session) => (
               <div
-                className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                  message.role === "user"
-                    ? "bg-[#A8BBA3] text-white"
-                    : message.isError
-                      ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
-                      : message.isOutOfScope
-                        ? "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400"
-                        : "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400"
-                }`}
+                key={session.id}
+                onClick={() => loadSession(session)}
+                className="p-3 bg-neutral-50 dark:bg-neutral-800/50 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded-lg cursor-pointer group transition-colors flex justify-between items-center"
               >
-                {message.role === "user" ? (
-                  <User className="h-4 w-4" />
-                ) : (
-                  <Bot className="h-4 w-4" />
-                )}
-              </div>
-
-              <div
-                className={`flex-1 max-w-[80%] ${
-                  message.role === "user" ? "text-right" : ""
-                }`}
-              >
-                <div
-                  className={`inline-block px-4 py-2.5 rounded-2xl text-sm ${
-                    message.role === "user"
-                      ? "bg-[#A8BBA3] text-white rounded-tr-sm"
-                      : message.isError
-                        ? "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 rounded-tl-sm"
-                        : message.isOutOfScope
-                          ? "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-tl-sm"
-                          : "bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 rounded-tl-sm"
-                  }`}
-                >
-                  <div className="whitespace-pre-wrap">{message.content}</div>
+                <div className="flex items-center gap-3 overflow-hidden">
+                  <div className="p-2 rounded-full bg-[#A8BBA3]/10 text-[#A8BBA3]">
+                    <MessageSquare className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm text-neutral-900 dark:text-white truncate">
+                      {session.title}
+                    </p>
+                    <p className="text-xs text-neutral-500">
+                      {formatDate(session.date)}
+                    </p>
+                  </div>
                 </div>
-                <div
-                  className={`text-xs text-neutral-400 mt-1 ${
-                    message.role === "user" ? "text-right" : ""
-                  }`}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => deleteSession(e, session.id)}
+                  className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 text-neutral-400 hover:text-red-500 transition-opacity"
                 >
-                  {formatTime(message.timestamp)}
-                </div>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-
-        {isLoading && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex gap-3"
-          >
-            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
-              <Bot className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
-            </div>
-            <div className="flex items-center gap-2 px-4 py-2.5 bg-neutral-100 dark:bg-neutral-800 rounded-2xl rounded-tl-sm">
-              <Loader2 className="h-4 w-4 animate-spin text-[#A8BBA3]" />
-              <span className="text-sm text-neutral-500 dark:text-neutral-400">
-                Thinking...
-              </span>
-            </div>
-          </motion.div>
-        )}
-
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input */}
-      <form
-        onSubmit={handleSubmit}
-        className="p-4 border-t border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900"
-      >
-        <div className="flex gap-2">
-          <input
-            ref={inputRef}
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Ask about DocTracker..."
-            disabled={isLoading || !isConfigured}
-            className="flex-1 px-4 py-2.5 bg-neutral-100 dark:bg-neutral-800 border-0 rounded-full text-sm text-neutral-900 dark:text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-[#A8BBA3]/50 disabled:opacity-50"
-          />
-          <Button
-            type="submit"
-            disabled={isLoading || !inputValue.trim() || !isConfigured}
-            className="h-10 w-10 p-0 rounded-full bg-[#A8BBA3] hover:bg-[#92a88d] disabled:opacity-50"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
+            ))
+          )}
         </div>
-      </form>
+      ) : (
+        <>
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {!isConfigured && isConfigured !== null && (
+              <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-amber-700 dark:text-amber-400 text-sm">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>
+                  AI Assistant is not configured. Please add OPENROUTER_API_KEY to
+                  your environment variables.
+                </span>
+              </div>
+            )}
+
+            {messages.length === 0 && isConfigured && (
+              <div className="text-center py-8">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#A8BBA3]/10 mb-4">
+                  <Bot className="h-8 w-8 text-[#A8BBA3]" />
+                </div>
+                <h4 className="text-lg font-medium text-neutral-900 dark:text-white mb-2">
+                  How can I help you?
+                </h4>
+                <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-6 max-w-xs mx-auto">
+                  Ask me anything about DocTracker - managing documents, settings,
+                  security, and more.
+                </p>
+
+                {/* Suggested questions */}
+                <div className="space-y-2">
+                  <p className="text-xs text-neutral-400 dark:text-neutral-500 uppercase tracking-wider">
+                    Suggested questions
+                  </p>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {SUGGESTED_QUESTIONS.map((question, index) => (
+                      <button
+                        key={index}
+                        onClick={() => handleSuggestedQuestion(question)}
+                        className="px-3 py-1.5 text-xs bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded-full transition-colors"
+                      >
+                        {question}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <AnimatePresence mode="popLayout">
+              {messages.map((message) => (
+                <motion.div
+                  key={message.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                  className={`flex gap-3 ${message.role === "user" ? "flex-row-reverse" : ""
+                    }`}
+                >
+                  <div
+                    className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${message.role === "user"
+                      ? "bg-[#A8BBA3] text-white"
+                      : message.isError
+                        ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
+                        : message.isOutOfScope
+                          ? "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400"
+                          : "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400"
+                      }`}
+                  >
+                    {message.role === "user" ? (
+                      <User className="h-4 w-4" />
+                    ) : (
+                      <Bot className="h-4 w-4" />
+                    )}
+                  </div>
+
+                  <div
+                    className={`flex-1 max-w-[80%] ${message.role === "user" ? "text-right" : ""
+                      }`}
+                  >
+                    <div
+                      className={`inline-block px-4 py-2.5 rounded-2xl text-sm ${message.role === "user"
+                        ? "bg-[#A8BBA3] text-white rounded-tr-sm"
+                        : message.isError
+                          ? "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 rounded-tl-sm"
+                          : message.isOutOfScope
+                            ? "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-tl-sm"
+                            : "bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 rounded-tl-sm"
+                        }`}
+                    >
+                      <div className="whitespace-pre-wrap">{message.content}</div>
+                    </div>
+                    <div
+                      className={`text-xs text-neutral-400 mt-1 ${message.role === "user" ? "text-right" : ""
+                        }`}
+                    >
+                      {formatTime(message.timestamp)}
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+
+            {isLoading && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex gap-3"
+              >
+                <div className="shrink-0 w-8 h-8 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
+                  <Bot className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
+                </div>
+                <div className="flex items-center gap-2 px-4 py-2.5 bg-neutral-100 dark:bg-neutral-800 rounded-2xl rounded-tl-sm">
+                  <Loader2 className="h-4 w-4 animate-spin text-[#A8BBA3]" />
+                  <span className="text-sm text-neutral-500 dark:text-neutral-400">
+                    Thinking...
+                  </span>
+                </div>
+              </motion.div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+
+          <form
+            onSubmit={handleSubmit}
+            className="p-4 border-t border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900"
+          >
+            <div className="flex gap-2">
+              <input
+                ref={inputRef}
+                type="text"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                placeholder="Ask about DocTracker..."
+                disabled={isLoading || !isConfigured}
+                className="flex-1 px-4 py-2.5 bg-neutral-100 dark:bg-neutral-800 border-0 rounded-full text-sm text-neutral-900 dark:text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-[#A8BBA3]/50 disabled:opacity-50"
+              />
+              <Button
+                type="submit"
+                disabled={isLoading || !inputValue.trim() || !isConfigured}
+                className="h-10 w-10 p-0 rounded-full bg-[#A8BBA3] hover:bg-[#92a88d] disabled:opacity-50"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+          </form>
+        </>
+      )}
     </div>
   );
 
@@ -363,7 +489,6 @@ export function AIChat({
 
   return (
     <>
-      {/* Floating button */}
       <AnimatePresence>
         {!isOpen && (
           <motion.button
@@ -380,7 +505,6 @@ export function AIChat({
         )}
       </AnimatePresence>
 
-      {/* Chat window */}
       <AnimatePresence>
         {isOpen && (
           <motion.div

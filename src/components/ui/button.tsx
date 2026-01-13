@@ -3,13 +3,6 @@ import { type VariantProps, cva } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 import { motion, MotionProps } from "framer-motion";
 
-// Need to install class-variance-authority if not present, but I can write a simple version or just assume standard prop patterns if CVA is not desired.
-// Since I didn't install CVA, I will just implement standard variants manually or use a simpler approach.
-// actually, for a "premium" feel, CVA is great. I'll add it to dependencies or just write a slightly more verbose component. 
-// Let's write a robust one without CVA for now to minimal dependencies, or I can just install it. 
-// I'll install it as it makes things much cleaner.
-// Wait, I am in non-interactive mode mostly. I'll just write it with clsx/tailwind-merge standard pattern.
-
 interface ButtonProps
     extends React.ButtonHTMLAttributes<HTMLButtonElement> {
     variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";

@@ -9,7 +9,7 @@ function getTransporter(): nodemailer.Transporter {
   if (!transporter) {
     if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
       throw new Error(
-        "GMAIL_USER and GMAIL_APP_PASSWORD environment variables are required",
+        "GMAIL_USER and GMAIL_APP_PASSWORD environment variables are required"
       );
     }
     transporter = nodemailer.createTransport({
@@ -36,7 +36,7 @@ function getSupabaseAdmin() {
     }
     supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
     );
   }
   return supabaseAdmin;
@@ -44,9 +44,9 @@ function getSupabaseAdmin() {
 
 interface Document {
   id: string;
-  name: string;
-  doc_type: string;
-  expiry_date: string;
+  title: string;
+  type: string;
+  expiration_date: string;
   user_id: string;
 }
 
@@ -57,166 +57,187 @@ interface UserInfo {
   notificationsEnabled: boolean;
 }
 
-// Notification intervals in days
-const NOTIFICATION_INTERVALS = [30, 15, 7, 1];
+// Default notification intervals in days (1 month, 15 days, 1 week, 1 day)
+const DEFAULT_NOTIFICATION_INTERVALS = [30, 15, 7, 1];
 
-// POST - Send automatic expiration notifications (called by cron job daily)
+// Helper to get user's custom intervals or defaults
+function getUserNotificationIntervals(
+  userMetadata: Record<string, unknown> | undefined
+): number[] {
+  if (
+    userMetadata?.notification_intervals &&
+    Array.isArray(userMetadata.notification_intervals)
+  ) {
+    const intervals = userMetadata.notification_intervals as number[];
+    // Validate that all values are positive numbers
+    if (intervals.every((n) => typeof n === "number" && n > 0)) {
+      return intervals.sort((a, b) => b - a); // Sort descending
+    }
+  }
+  return DEFAULT_NOTIFICATION_INTERVALS;
+}
+
+// Send notifications - shared logic for GET cron and POST manual triggers
+async function sendNotifications(
+  cronSecret?: string,
+  authHeader?: string | null
+) {
+  // Allow requests without auth in development, require in production
+  if (
+    cronSecret &&
+    process.env.NODE_ENV === "production" &&
+    authHeader !== `Bearer ${cronSecret}`
+  ) {
+    return { error: "Unauthorized", status: 401 };
+  }
+
+  const supabase = getSupabaseAdmin();
+  const now = new Date();
+  now.setHours(0, 0, 0, 0); // Start of today
+
+  // Get all documents with expiry dates in the next 31 days
+  const thirtyOneDaysFromNow = new Date(now);
+  thirtyOneDaysFromNow.setDate(thirtyOneDaysFromNow.getDate() + 31);
+
+  const { data: expiringDocuments, error: docsError } = (await supabase
+    .from("documents")
+    .select("id, title, type, expiration_date, user_id")
+    .gte("expiration_date", now.toISOString().split("T")[0])
+    .lte(
+      "expiration_date",
+      thirtyOneDaysFromNow.toISOString().split("T")[0]
+    )) as {
+    data: Document[] | null;
+    error: Error | null;
+  };
+
+  if (docsError) {
+    console.error("Error fetching documents:", docsError);
+    return { error: "Failed to fetch documents", status: 500 };
+  }
+
+  if (!expiringDocuments || expiringDocuments.length === 0) {
+    return {
+      message: "No documents expiring in the next 31 days",
+      sent: 0,
+    };
+  }
+
+  // Get unique user IDs
+  const userIds = [...new Set(expiringDocuments.map((doc) => doc.user_id))];
+
+  // Fetch user details and cache them
+  const userCache: Map<string, UserInfo & { intervals: number[] }> = new Map();
+
+  for (const userId of userIds) {
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.admin.getUserById(userId);
+
+    if (userError || !user?.email) {
+      console.error(`Error fetching user ${userId}:`, userError);
+      continue;
+    }
+
+    userCache.set(userId, {
+      id: userId,
+      email: user.email,
+      name:
+        user.user_metadata?.name ||
+        user.user_metadata?.full_name ||
+        user.email.split("@")[0],
+      notificationsEnabled: user.user_metadata?.email_notifications !== false,
+      intervals: getUserNotificationIntervals(user.user_metadata),
+    });
+  }
+
+  // Send individual notifications for each document
+  let sentCount = 0;
+  let skippedCount = 0;
+  const errors: string[] = [];
+  const mailTransporter = getTransporter();
+
+  for (const doc of expiringDocuments) {
+    const userInfo = userCache.get(doc.user_id);
+
+    if (!userInfo) {
+      skippedCount++;
+      continue;
+    }
+
+    if (!userInfo.notificationsEnabled) {
+      skippedCount++;
+      continue;
+    }
+
+    // Calculate days until expiry
+    const expiryDate = new Date(doc.expiration_date);
+    const daysUntil = Math.ceil(
+      (expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    // Check if today is a notification day for this user's intervals
+    const shouldNotify = userInfo.intervals.includes(daysUntil);
+
+    if (!shouldNotify) {
+      continue; // Not a notification day for this document
+    }
+
+    // Generate email
+    const emailHtml = generateReminderEmail(
+      userInfo.name,
+      doc.title,
+      doc.type,
+      doc.expiration_date,
+      daysUntil
+    );
+
+    const subject = getSubjectLine(doc.title, daysUntil);
+
+    try {
+      await mailTransporter.sendMail({
+        from: `DocTracker <${process.env.GMAIL_USER}>`,
+        to: userInfo.email,
+        subject: subject,
+        html: emailHtml,
+      });
+
+      sentCount++;
+    } catch (err) {
+      const errorMsg = `Failed to send to ${userInfo.email}: ${
+        err instanceof Error ? err.message : "Unknown error"
+      }`;
+      console.error(errorMsg);
+      errors.push(errorMsg);
+    }
+  }
+
+  return {
+    message: "Notification job completed",
+    sent: sentCount,
+    skipped: skippedCount,
+    total: expiringDocuments.length,
+    errors: errors.length > 0 ? errors : undefined,
+  };
+}
+
+// POST - Send automatic expiration notifications (manual trigger)
 export async function POST(request: NextRequest) {
   try {
-    // Verify the request is authorized (optional - for cron jobs)
     const authHeader = request.headers.get("authorization");
     const cronSecret = process.env.CRON_SECRET;
 
-    // Allow requests without auth in development, require in production
-    if (
-      cronSecret &&
-      process.env.NODE_ENV === "production" &&
-      authHeader !== `Bearer ${cronSecret}`
-    ) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const result = await sendNotifications(cronSecret, authHeader);
 
-    const supabase = getSupabaseAdmin();
-    const now = new Date();
-    now.setHours(0, 0, 0, 0); // Start of today
-
-    // Calculate target dates for each notification interval
-    const targetDates = NOTIFICATION_INTERVALS.map((days) => {
-      const date = new Date(now);
-      date.setDate(date.getDate() + days);
-      return {
-        days,
-        date: date.toISOString().split("T")[0],
-      };
-    });
-
-    console.log(
-      "Checking for documents expiring on:",
-      targetDates.map((t) => `${t.days} days: ${t.date}`),
-    );
-
-    // Fetch all documents expiring on any of the target dates
-    const dateStrings = targetDates.map((t) => t.date);
-
-    const { data: expiringDocuments, error: docsError } = (await supabase
-      .from("documents")
-      .select("id, name, doc_type, expiry_date, user_id")
-      .in("expiry_date", dateStrings)) as {
-      data: Document[] | null;
-      error: Error | null;
-    };
-
-    if (docsError) {
-      console.error("Error fetching documents:", docsError);
+    if (result.error) {
       return NextResponse.json(
-        { error: "Failed to fetch documents" },
-        { status: 500 },
+        { error: result.error },
+        { status: result.status }
       );
     }
 
-    if (!expiringDocuments || expiringDocuments.length === 0) {
-      return NextResponse.json({
-        message: "No documents expiring on notification dates",
-        sent: 0,
-        checked: dateStrings,
-      });
-    }
-
-    console.log(`Found ${expiringDocuments.length} documents to notify about`);
-
-    // Get unique user IDs
-    const userIds = [...new Set(expiringDocuments.map((doc) => doc.user_id))];
-
-    // Fetch user details and cache them
-    const userCache: Map<string, UserInfo> = new Map();
-
-    for (const userId of userIds) {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.admin.getUserById(userId);
-
-      if (userError || !user?.email) {
-        console.error(`Error fetching user ${userId}:`, userError);
-        continue;
-      }
-
-      userCache.set(userId, {
-        id: userId,
-        email: user.email,
-        name:
-          user.user_metadata?.name ||
-          user.user_metadata?.full_name ||
-          user.email.split("@")[0],
-        notificationsEnabled: user.user_metadata?.email_notifications !== false,
-      });
-    }
-
-    // Send individual notifications for each document
-    let sentCount = 0;
-    let skippedCount = 0;
-    const errors: string[] = [];
-    const mailTransporter = getTransporter();
-
-    for (const doc of expiringDocuments) {
-      const userInfo = userCache.get(doc.user_id);
-
-      if (!userInfo) {
-        console.log(`User not found for document ${doc.id}`);
-        skippedCount++;
-        continue;
-      }
-
-      if (!userInfo.notificationsEnabled) {
-        console.log(`Notifications disabled for user ${userInfo.email}`);
-        skippedCount++;
-        continue;
-      }
-
-      // Calculate days until expiry
-      const expiryDate = new Date(doc.expiry_date);
-      const daysUntil = Math.ceil(
-        (expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
-      );
-
-      // Generate email
-      const emailHtml = generateReminderEmail(
-        userInfo.name,
-        doc.name,
-        doc.doc_type,
-        doc.expiry_date,
-        daysUntil,
-      );
-
-      const subject = getSubjectLine(doc.name, daysUntil);
-
-      try {
-        await mailTransporter.sendMail({
-          from: `DocTracker <${process.env.GMAIL_USER}>`,
-          to: userInfo.email,
-          subject: subject,
-          html: emailHtml,
-        });
-
-        console.log(
-          `✓ Sent ${daysUntil}-day reminder to ${userInfo.email} for "${doc.name}"`,
-        );
-        sentCount++;
-      } catch (err) {
-        const errorMsg = `Failed to send to ${userInfo.email}: ${err instanceof Error ? err.message : "Unknown error"}`;
-        console.error(errorMsg);
-        errors.push(errorMsg);
-      }
-    }
-
-    return NextResponse.json({
-      message: "Notification job completed",
-      sent: sentCount,
-      skipped: skippedCount,
-      total: expiringDocuments.length,
-      checkedDates: dateStrings,
-      errors: errors.length > 0 ? errors : undefined,
-    });
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Notification error:", error);
     return NextResponse.json(
@@ -224,16 +245,45 @@ export async function POST(request: NextRequest) {
         error: "Internal server error",
         details: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
 
-// GET - Check notification status for a user or test the system
+// GET - Check notification status, test the system, or trigger cron notifications
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const userId = searchParams.get("userId");
   const test = searchParams.get("test");
+  const trigger = searchParams.get("trigger");
+
+  // Handle cron trigger - this is how Vercel cron jobs call the API
+  if (trigger === "cron") {
+    const authHeader = request.headers.get("authorization");
+    const cronSecret = process.env.CRON_SECRET;
+
+    try {
+      const result = await sendNotifications(cronSecret, authHeader);
+
+      if (result.error) {
+        return NextResponse.json(
+          { error: result.error },
+          { status: result.status }
+        );
+      }
+
+      return NextResponse.json(result);
+    } catch (error) {
+      console.error("Cron notification error:", error);
+      return NextResponse.json(
+        {
+          error: "Internal server error",
+          details: error instanceof Error ? error.message : "Unknown error",
+        },
+        { status: 500 }
+      );
+    }
+  }
 
   // Test endpoint to verify email configuration
   if (test === "true") {
@@ -243,7 +293,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         status: "ok",
         message: "Email configuration is valid",
-        intervals: NOTIFICATION_INTERVALS,
+        intervals: DEFAULT_NOTIFICATION_INTERVALS,
       });
     } catch (error) {
       return NextResponse.json(
@@ -252,7 +302,7 @@ export async function GET(request: NextRequest) {
           message: "Email configuration failed",
           error: error instanceof Error ? error.message : "Unknown error",
         },
-        { status: 500 },
+        { status: 500 }
       );
     }
   }
@@ -260,10 +310,11 @@ export async function GET(request: NextRequest) {
   if (!userId) {
     return NextResponse.json(
       {
-        error: "User ID is required. Use ?userId=xxx or ?test=true",
-        intervals: NOTIFICATION_INTERVALS,
+        error:
+          "User ID is required. Use ?userId=xxx, ?test=true, or ?trigger=cron",
+        intervals: DEFAULT_NOTIFICATION_INTERVALS,
       },
-      { status: 400 },
+      { status: 400 }
     );
   }
 
@@ -271,16 +322,24 @@ export async function GET(request: NextRequest) {
     const supabase = getSupabaseAdmin();
     const now = new Date();
 
+    // Get the user's custom notification intervals
+    const {
+      data: { user },
+    } = await supabase.auth.admin.getUserById(userId);
+
+    const userIntervals = getUserNotificationIntervals(user?.user_metadata);
+
     // Get all upcoming expiring documents for the user (next 60 days)
     const sixtyDaysFromNow = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
 
     const { data: documents, error } = (await supabase
       .from("documents")
-      .select("id, name, doc_type, expiry_date")
+      .select("id, title, type, expiration_date")
+      // Filter for active documents
       .eq("user_id", userId)
-      .gte("expiry_date", now.toISOString().split("T")[0])
-      .lte("expiry_date", sixtyDaysFromNow.toISOString().split("T")[0])
-      .order("expiry_date", { ascending: true })) as {
+      .gte("expiration_date", now.toISOString().split("T")[0])
+      .lte("expiration_date", sixtyDaysFromNow.toISOString().split("T")[0])
+      .order("expiration_date", { ascending: true })) as {
       data: Document[] | null;
       error: Error | null;
     };
@@ -288,28 +347,28 @@ export async function GET(request: NextRequest) {
     if (error) {
       return NextResponse.json(
         { error: "Failed to fetch documents" },
-        { status: 500 },
+        { status: 500 }
       );
     }
 
     // Calculate when each document will receive notifications
     const documentsWithNotifications = documents?.map((doc) => {
-      const expiryDate = new Date(doc.expiry_date);
+      const expiryDate = new Date(doc.expiration_date);
       const daysUntil = Math.ceil(
-        (expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+        (expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
       );
 
-      const upcomingNotifications = NOTIFICATION_INTERVALS.filter(
-        (interval) => interval <= daysUntil,
-      ).map((interval) => {
-        const notifyDate = new Date(expiryDate);
-        notifyDate.setDate(notifyDate.getDate() - interval);
-        return {
-          daysBeforeExpiry: interval,
-          notificationDate: notifyDate.toISOString().split("T")[0],
-          alreadySent: interval > daysUntil,
-        };
-      });
+      const upcomingNotifications = userIntervals
+        .filter((interval) => interval <= daysUntil)
+        .map((interval) => {
+          const notifyDate = new Date(expiryDate);
+          notifyDate.setDate(notifyDate.getDate() - interval);
+          return {
+            daysBeforeExpiry: interval,
+            notificationDate: notifyDate.toISOString().split("T")[0],
+            alreadySent: interval > daysUntil,
+          };
+        });
 
       return {
         ...doc,
@@ -321,14 +380,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       userId,
       expiringCount: documents?.length || 0,
-      notificationIntervals: NOTIFICATION_INTERVALS,
+      notificationIntervals: userIntervals,
+      defaultIntervals: DEFAULT_NOTIFICATION_INTERVALS,
       documents: documentsWithNotifications || [],
     });
   } catch (error) {
     console.error("Error checking notifications:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
@@ -336,7 +396,7 @@ export async function GET(request: NextRequest) {
 // PUT - Send a test notification to verify email setup
 export async function PUT(request: NextRequest) {
   try {
-    const { email, testMode } = await request.json();
+    const { email } = await request.json();
 
     if (!email) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
@@ -357,8 +417,8 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({
       message: "Test email sent successfully",
       sentTo: email,
-      notificationSchedule: NOTIFICATION_INTERVALS.map(
-        (d) => `${d} day${d > 1 ? "s" : ""} before expiry`,
+      notificationSchedule: DEFAULT_NOTIFICATION_INTERVALS.map(
+        (d) => `${d} day${d > 1 ? "s" : ""} before expiry`
       ),
     });
   } catch (error) {
@@ -368,7 +428,7 @@ export async function PUT(request: NextRequest) {
         error: "Failed to send test notification",
         details: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
@@ -453,7 +513,7 @@ function generateTestEmail(userEmail: string): string {
                   </p>
 
                   <div style="background-color: #F0FDF4; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
-                    <h3 style="margin: 0 0 16px 0; color: #166534; font-size: 16px;">📬 You will receive reminders:</h3>
+                    <h3 style="margin: 0 0 16px 0; color: #166534; font-size: 16px;">📬 Default reminder schedule:</h3>
                     <ul style="margin: 0; padding-left: 20px; color: #15803D;">
                       <li style="margin-bottom: 8px;"><strong>30 days</strong> before expiry (Advance Notice)</li>
                       <li style="margin-bottom: 8px;"><strong>15 days</strong> before expiry (Reminder)</li>
@@ -463,13 +523,16 @@ function generateTestEmail(userEmail: string): string {
                   </div>
 
                   <p style="margin: 0 0 24px 0; color: #6B7280; font-size: 14px; line-height: 1.6;">
-                    You'll automatically receive email reminders for all your documents with expiration dates. Never miss a renewal deadline again!
+                    You can customize your reminder schedule in your profile settings. Never miss a renewal deadline again!
                   </p>
 
                   <table width="100%" cellpadding="0" cellspacing="0">
                     <tr>
                       <td align="center">
-                        <a href="${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard"
+                        <a href="${
+                          process.env.NEXT_PUBLIC_APP_URL ||
+                          "http://localhost:3000"
+                        }/dashboard"
                            style="display: inline-block; padding: 16px 40px; background: linear-gradient(135deg, #A8BBA3 0%, #8FA58F 100%); color: #FFFFFF; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
                           Go to Dashboard
                         </a>
@@ -482,7 +545,9 @@ function generateTestEmail(userEmail: string): string {
                 <td style="padding: 24px 40px; background-color: #F9FAFB; border-top: 1px solid #E5E7EB; text-align: center;">
                   <p style="margin: 0; color: #9CA3AF; font-size: 12px;">
                     This email was sent to ${userEmail}<br>
-                    <a href="${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/profile?tab=settings" style="color: #6B7280;">Manage preferences</a>
+                    <a href="${
+                      process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+                    }/dashboard/profile?tab=settings" style="color: #6B7280;">Manage preferences</a>
                   </p>
                 </td>
               </tr>
@@ -500,7 +565,7 @@ function generateReminderEmail(
   documentName: string,
   documentType: string,
   expiryDate: string,
-  daysUntil: number,
+  daysUntil: number
 ): string {
   const config = getUrgencyConfig(daysUntil);
 
@@ -515,8 +580,8 @@ function generateReminderEmail(
     daysUntil === 0
       ? "TODAY"
       : daysUntil === 1
-        ? "TOMORROW"
-        : `in ${daysUntil} days`;
+      ? "TOMORROW"
+      : `in ${daysUntil} days`;
 
   return `
     <!DOCTYPE html>
@@ -540,12 +605,18 @@ function generateReminderEmail(
 
               <!-- Urgency Banner -->
               <tr>
-                <td style="background-color: ${config.bgColor}; padding: 16px 32px; border-bottom: 3px solid ${config.borderColor};">
+                <td style="background-color: ${
+                  config.bgColor
+                }; padding: 16px 32px; border-bottom: 3px solid ${
+    config.borderColor
+  };">
                   <table width="100%" cellpadding="0" cellspacing="0">
                     <tr>
                       <td style="text-align: center;">
                         <span style="font-size: 24px;">${config.icon}</span>
-                        <span style="color: ${config.color}; font-weight: 700; font-size: 14px; letter-spacing: 1px; margin-left: 8px; vertical-align: middle;">
+                        <span style="color: ${
+                          config.color
+                        }; font-weight: 700; font-size: 14px; letter-spacing: 1px; margin-left: 8px; vertical-align: middle;">
                           ${config.urgencyText}
                         </span>
                       </td>
@@ -576,11 +647,17 @@ function generateReminderEmail(
                           <p style="margin: 0 0 16px 0; color: #6B7280; font-size: 14px;">
                             ${documentType}
                           </p>
-                          <div style="display: inline-block; background-color: ${config.bgColor}; border-radius: 8px; padding: 12px 16px;">
-                            <p style="margin: 0; color: ${config.color}; font-size: 14px;">
+                          <div style="display: inline-block; background-color: ${
+                            config.bgColor
+                          }; border-radius: 8px; padding: 12px 16px;">
+                            <p style="margin: 0; color: ${
+                              config.color
+                            }; font-size: 14px;">
                               <strong>Expires ${daysText}</strong>
                             </p>
-                            <p style="margin: 4px 0 0 0; color: ${config.color}; font-size: 12px;">
+                            <p style="margin: 4px 0 0 0; color: ${
+                              config.color
+                            }; font-size: 12px;">
                               ${formattedDate}
                             </p>
                           </div>
@@ -593,7 +670,10 @@ function generateReminderEmail(
                   <table width="100%" cellpadding="0" cellspacing="0">
                     <tr>
                       <td align="center" style="padding: 8px 0 24px 0;">
-                        <a href="${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard"
+                        <a href="${
+                          process.env.NEXT_PUBLIC_APP_URL ||
+                          "http://localhost:3000"
+                        }/dashboard"
                            style="display: inline-block; padding: 16px 40px; background: linear-gradient(135deg, #A8BBA3 0%, #8FA58F 100%); color: #FFFFFF; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
                           View Document
                         </a>
@@ -631,7 +711,9 @@ function generateReminderEmail(
                     You're receiving this because you have document expiration notifications enabled.
                   </p>
                   <p style="margin: 0; color: #9CA3AF; font-size: 12px; text-align: center;">
-                    <a href="${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard/profile?tab=settings"
+                    <a href="${
+                      process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+                    }/dashboard/profile?tab=settings"
                        style="color: #6B7280; text-decoration: underline;">
                       Manage notification preferences
                     </a>
@@ -648,8 +730,8 @@ function generateReminderEmail(
 }
 
 function getNextReminderText(currentDaysUntil: number): string {
-  const nextIntervals = NOTIFICATION_INTERVALS.filter(
-    (interval) => interval < currentDaysUntil,
+  const nextIntervals = DEFAULT_NOTIFICATION_INTERVALS.filter(
+    (interval) => interval < currentDaysUntil
   );
 
   if (nextIntervals.length === 0) {

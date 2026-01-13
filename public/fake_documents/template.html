@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fake Documents Generator</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Courier+Prime:wght@400;700&display=swap");
+
+      body {
+        font-family: "Inter", sans-serif;
+        background-color: #f0f0f0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 50px;
+        padding: 50px;
+      }
+
+      .document-container {
+        position: relative;
+        background: white;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+      }
+
+      /* DRIVING LICENSE */
+      .license-card {
+        width: 500px; /* ~85.6mm */
+        height: 315px; /* ~54mm */
+        border-radius: 12px;
+        background: linear-gradient(
+          135deg,
+          #e0f7fa 0%,
+          #ffffff 50%,
+          #e0f7fa 100%
+        );
+        border: 1px solid #ccc;
+        padding: 20px;
+        display: grid;
+        grid-template-columns: 130px 1fr;
+        grid-template-rows: 40px 1fr;
+        gap: 15px;
+        position: relative;
+      }
+
+      .license-card::before {
+        content: "NEPAL"; /* Watermark-ish */
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) rotate(-30deg);
+        font-size: 80px;
+        color: rgba(0, 0, 0, 0.03);
+        font-weight: 800;
+        pointer-events: none;
+      }
+
+      .license-header {
+        grid-column: 1 / -1;
+        border-bottom: 2px solid #0056b3;
+        padding-bottom: 5px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+      }
+      .license-title {
+        font-size: 18px;
+        font-weight: 800;
+        color: #0056b3;
+        text-transform: uppercase;
+      }
+      .license-subtitle {
+        font-size: 10px;
+        color: #555;
+        text-transform: uppercase;
+      }
+
+      .license-photo {
+        width: 120px;
+        height: 150px;
+        background-color: #ddd;
+        border: 2px solid #fff;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #888;
+        font-size: 12px;
+        flex-direction: column;
+      }
+      .license-photo span {
+        font-size: 40px;
+      }
+
+      .license-details {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        font-family: "Courier Prime", monospace;
+        font-size: 14px;
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
+      }
+      .label {
+        font-size: 9px;
+        color: #666;
+        font-weight: 600;
+        text-transform: uppercase;
+      }
+      .value {
+        font-weight: 700;
+        color: #222;
+      }
+
+      .row {
+        display: flex;
+        gap: 20px;
+      }
+
+      /* PASSPORT */
+      .passport-page {
+        width: 500px;
+        height: 700px; /* Cropped view of data page */
+        background: #fffdf5;
+        background-image: radial-gradient(#e6e6e6 1px, transparent 1px);
+        background-size: 20px 20px;
+        padding: 30px;
+        border: 1px solid #ddd;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      .passport-header {
+        text-align: center;
+        border-bottom: 1px solid #ccc;
+        padding-bottom: 15px;
+      }
+      .passport-country {
+        font-size: 24px;
+        font-weight: 900;
+        letter-spacing: 2px;
+      }
+      .passport-type {
+        font-size: 14px;
+        color: #555;
+        margin-top: 5px;
+      }
+
+      .passport-body {
+        display: grid;
+        grid-template-columns: 140px 1fr;
+        gap: 20px;
+      }
+
+      .passport-photo {
+        width: 140px;
+        height: 180px;
+        background: #eee;
+        border: 1px solid #999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #aaa;
+      }
+
+      .mrz-zone {
+        margin-top: auto;
+        font-family: "Courier New", Courier, monospace;
+        font-size: 16px;
+        line-height: 1.5;
+        letter-spacing: 2px;
+        background: #fff;
+        padding: 10px;
+        border: 1px dashed #ccc;
+      }
+
+      /* BLUEBOOK / REGISTRATION */
+      .bluebook-card {
+        width: 600px;
+        height: 400px;
+        background: #fdfbf7;
+        border: 4px double #8b4513;
+        padding: 30px;
+        position: relative;
+      }
+      .bluebook-header {
+        text-align: center;
+        color: #8b4513;
+        margin-bottom: 30px;
+        border-bottom: 2px solid #8b4513;
+        padding-bottom: 10px;
+      }
+      .bluebook-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+      }
+      .seal {
+        position: absolute;
+        bottom: 30px;
+        right: 30px;
+        width: 80px;
+        height: 80px;
+        border: 3px solid #b22222;
+        border-radius: 50%;
+        color: #b22222;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        transform: rotate(-15deg);
+        opacity: 0.6;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- 1. DRIVING LICENSE -->
+    <div id="license" class="document-container license-card">
+      <div class="license-header">
+        <div class="license-title">Driving License</div>
+        <div class="license-subtitle">Republic of Nepal</div>
+      </div>
+      <div class="license-photo">
+        <span>👤</span>
+        <div>PHOTO</div>
+      </div>
+      <div class="license-details">
+        <div class="field">
+          <span class="label">License No</span>
+          <span class="value">01-02-3456789</span>
+        </div>
+        <div class="field">
+          <span class="label">Name</span>
+          <span class="value">RAMESH BAHADUR THAPA</span>
+        </div>
+        <div class="field">
+          <span class="label">Address</span>
+          <span class="value">KATHMANDU-04, BAGMATI</span>
+        </div>
+        <div class="row">
+          <div class="field">
+            <span class="label">Date of Birth</span>
+            <span class="value">1990-05-15</span>
+          </div>
+          <div class="field">
+            <span class="label">Blood Group</span>
+            <span class="value">B+</span>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <span class="label">Issue Date</span>
+            <span class="value">2022-01-01</span>
+          </div>
+          <div class="field" style="color: #d32f2f">
+            <span class="label">Expiry Date</span>
+            <span class="value">2027-01-01</span>
+          </div>
+        </div>
+        <div class="field">
+          <span class="label">Category</span>
+          <span class="value">A (Motorcycle), B (Car)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. PASSPORT -->
+    <div id="passport" class="document-container passport-page">
+      <div class="passport-header">
+        <div class="passport-country">NEPAL</div>
+        <div class="passport-type">PASSPORT / RAHADANI</div>
+      </div>
+      <div class="passport-body">
+        <div class="passport-photo">
+          <span>Pass<br />Photo</span>
+        </div>
+        <div class="license-details" style="gap: 15px">
+          <div class="row">
+            <div class="field">
+              <span class="label">Type / Type</span>
+              <span class="value">P</span>
+            </div>
+            <div class="field">
+              <span class="label">Country Code</span>
+              <span class="value">NPL</span>
+            </div>
+            <div class="field">
+              <span class="label">Passport No.</span>
+              <span class="value">AA 1234567</span>
+            </div>
+          </div>
+          <div class="field">
+            <span class="label">Surname</span>
+            <span class="value">SHRESTHA</span>
+          </div>
+          <div class="field">
+            <span class="label">Given Names</span>
+            <span class="value">SITA DEVI</span>
+          </div>
+          <div class="field">
+            <span class="label">Nationality</span>
+            <span class="value">NEPALESE</span>
+          </div>
+          <div class="row">
+            <div class="field">
+              <span class="label">Date of Birth</span>
+              <span class="value">15 OCT 1995</span>
+            </div>
+            <div class="field">
+              <span class="label">Sex</span>
+              <span class="value">F</span>
+            </div>
+          </div>
+          <div class="row">
+            <div class="field">
+              <span class="label">Date of Issue</span>
+              <span class="value">20 OCT 2023</span>
+            </div>
+            <div class="field">
+              <span class="label">Date of Expiry</span>
+              <span class="value">19 OCT 2033</span>
+            </div>
+          </div>
+          <div class="field">
+            <span class="label">Issuing Authority</span>
+            <span class="value">MOFA, KATHMANDU</span>
+          </div>
+        </div>
+      </div>
+      <div class="mrz-zone">
+        P&lt;NPLSHRESTHA&lt;&lt;SITA&lt;DEVI&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;<br />
+        AA1234567&lt;4NPL9510156F3310197&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;02
+      </div>
+    </div>
+
+    <!-- 3. BLUEBOOK -->
+    <div id="bluebook" class="document-container bluebook-card">
+      <div class="bluebook-header">
+        <h2>VEHICLE REGISTRATION CERTIFICATE</h2>
+        <div style="font-size: 14px">Government of Nepal</div>
+      </div>
+      <div class="bluebook-grid">
+        <div class="field">
+          <span class="label">Registration No</span>
+          <span class="value" style="font-size: 18px">BA 2 PA 9988</span>
+        </div>
+        <div class="field">
+          <span class="label">Vehicle Type</span>
+          <span class="value">MOTORCYCLE</span>
+        </div>
+
+        <div class="field" style="grid-column: 1/-1">
+          <span class="label">Owner Name</span>
+          <span class="value">ARUN KUMAR GUPTA</span>
+        </div>
+
+        <div class="field">
+          <span class="label">Make / Model</span>
+          <span class="value">HONDA / CB SHINE</span>
+        </div>
+        <div class="field">
+          <span class="label">Year of Manufacture</span>
+          <span class="value">2021</span>
+        </div>
+
+        <div class="field">
+          <span class="label">Engine No</span>
+          <span class="value">JC55E-7890123</span>
+        </div>
+        <div class="field">
+          <span class="label">Chassis No</span>
+          <span class="value">MBLJC55-4567890</span>
+        </div>
+
+        <div
+          class="field"
+          style="
+            grid-column: 1/-1;
+            margin-top: 10px;
+            border: 2px solid #b22222;
+            padding: 10px;
+            border-radius: 8px;
+          "
+        >
+          <span class="label" style="color: #b22222"
+            >Registration Valid Until</span
+          >
+          <span class="value" style="color: #b22222; font-size: 20px"
+            >2082-03-15 (BS)</span
+          >
+          <span class="label" style="margin-top: 5px"
+            >(Approx: 2025-06-29)</span
+          >
+        </div>
+      </div>
+      <div class="seal">OFFICIAL<br />SEAL</div>
+    </div>
+  </body>
+</html>

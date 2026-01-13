@@ -263,21 +263,47 @@ export default function RemindersPage() {
   const handleDeleteConfirm = async () => {
     if (!selectedDocument) return;
 
+    const documentToDelete = selectedDocument;
+    const documentTitle = documentToDelete.title;
+
+    // Optimistically remove the document from the UI immediately
+    setDocuments((prevDocs) =>
+      prevDocs.filter((doc) => doc.id !== documentToDelete.id),
+    );
+    setIsDeleteModalOpen(false);
+    setSelectedDocument(null);
+    setOpenMenuId(null);
+
     try {
-      const response = await fetch("/api/documents", {
+      const response = await fetch(`/api/documents/${documentToDelete.id}`, {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: selectedDocument.id }),
       });
       const data = await response.json();
 
       if (data.success) {
-        handleRefresh();
-        setIsDeleteModalOpen(false);
-        setSelectedDocument(null);
+        addToast({
+          type: "success",
+          title: "Document Deleted",
+          message: `"${documentTitle}" has been permanently removed.`,
+        });
+      } else {
+        // Restore the document if deletion failed
+        setDocuments((prevDocs) => [...prevDocs, documentToDelete]);
+        addToast({
+          type: "error",
+          title: "Deletion Failed",
+          message: "Could not delete the document. Please try again.",
+        });
       }
     } catch (error) {
       console.error("Error deleting document:", error);
+      // Restore the document on error
+      setDocuments((prevDocs) => [...prevDocs, documentToDelete]);
+      addToast({
+        type: "error",
+        title: "Deletion Failed",
+        message: "An error occurred while deleting. Please try again.",
+      });
     }
   };
 
@@ -463,7 +489,7 @@ export default function RemindersPage() {
             </motion.div>
           ) : (
             <div className="space-y-3">
-              <AnimatePresence>
+              <AnimatePresence mode="popLayout" initial={false}>
                 {sortedDocuments.map((doc, index) => {
                   const status = getDocumentStatus(doc.expiration_date);
                   const daysUntil = getDaysUntilExpiration(doc.expiration_date);
@@ -475,11 +501,26 @@ export default function RemindersPage() {
                     <motion.div
                       key={doc.id}
                       layout
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, x: -20 }}
-                      transition={{ delay: index * 0.05 }}
-                      className={`bg-white dark:bg-neutral-900 rounded-xl p-4 border-l-4 border shadow-sm hover:shadow-md transition-shadow ${
+                      initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{
+                        opacity: 0,
+                        x: -100,
+                        scale: 0.9,
+                        transition: { duration: 0.3, ease: "easeInOut" },
+                      }}
+                      whileHover={{
+                        boxShadow:
+                          status === "expired"
+                            ? "0 4px 12px rgba(239, 68, 68, 0.12)"
+                            : "0 4px 12px rgba(249, 115, 22, 0.12)",
+                        transition: { duration: 0.2, ease: "easeOut" },
+                      }}
+                      transition={{
+                        delay: index * 0.05,
+                        layout: { duration: 0.3, ease: "easeInOut" },
+                      }}
+                      className={`bg-white dark:bg-neutral-900 rounded-xl p-4 border-l-4 border shadow-sm transition-shadow ${
                         status === "expired"
                           ? "border-l-red-500 bg-red-50/50 dark:bg-red-900/10"
                           : "border-l-orange-500 bg-orange-50/50 dark:bg-orange-900/10"

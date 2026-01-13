@@ -7,10 +7,11 @@ export interface OCRResult {
 
 export interface ExtractedDocumentData {
   title: string | null;
-  type: "Rent" | "Insurance" | "Subscription" | "License" | "Other";
+  type: string; // Changed from stringent union to string to allow AI's flexibility
   expiration_date: string | null;
   raw_text: string;
   dates_found: string[];
+  metadata?: Record<string, any>; // New field for dynamic data
 }
 
 let workerInstance: Worker | null = null;
@@ -55,9 +56,13 @@ export async function performOCR(
   const imageUrl = URL.createObjectURL(file);
 
   try {
-    const result = await worker.recognize(imageUrl, {}, {
-      text: true,
-    });
+    const result = await worker.recognize(
+      imageUrl,
+      {},
+      {
+        text: true,
+      }
+    );
 
     onProgress?.(100);
 
@@ -258,8 +263,12 @@ function detectDocumentType(
   };
 
   let maxScore = 0;
-  let detectedType: "Rent" | "Insurance" | "Subscription" | "License" | "Other" =
-    "Other";
+  let detectedType:
+    | "Rent"
+    | "Insurance"
+    | "Subscription"
+    | "License"
+    | "Other" = "Other";
 
   for (const [type, keywords] of Object.entries(typePatterns)) {
     let score = 0;
@@ -313,11 +322,22 @@ function normalizeDate(dateStr: string): string | null {
 }
 
 export function extractDocumentData(text: string): ExtractedDocumentData {
+  if (!text) {
+    return {
+      title: null,
+      type: "Other",
+      expiration_date: null,
+      raw_text: "",
+      dates_found: [],
+    };
+  }
   const dates = extractDates(text);
   const expirationDate = findExpirationDate(text, dates);
   const title = extractTitle(text);
   const documentType = detectDocumentType(text);
-  const normalizedExpDate = expirationDate ? normalizeDate(expirationDate) : null;
+  const normalizedExpDate = expirationDate
+    ? normalizeDate(expirationDate)
+    : null;
 
   return {
     title,
@@ -328,10 +348,57 @@ export function extractDocumentData(text: string): ExtractedDocumentData {
   };
 }
 
+// Helper to call the AI processing API
+async function processWithAI(
+  text: string
+): Promise<Partial<ExtractedDocumentData>> {
+  try {
+    const response = await fetch("/api/process-document", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+
+    if (!response.ok) {
+      throw new Error("AI processing failed");
+    }
+
+    const data = await response.json();
+    return {
+      title: data.title,
+      type: data.type,
+      expiration_date: data.expiration_date,
+      metadata: data.metadata,
+    };
+  } catch (error) {
+    console.error("AI processing error:", error);
+    return {};
+  }
+}
+
 export async function processDocument(
   file: File,
   onProgress?: (progress: number) => void
 ): Promise<ExtractedDocumentData> {
+  // 1. Perform OCR (Client-side)
   const ocrResult = await performOCR(file, onProgress);
-  return extractDocumentData(ocrResult.text);
+  const text = ocrResult.text || "";
+
+  // 2. Extract regex-based data (Legacy/Fallback)
+  const legacyData = extractDocumentData(text);
+
+  // 3. Process with AI (Server-side)
+  // We notify progress as 100% done with OCR, now "Analyzing..."
+  const aiData = await processWithAI(text);
+
+  // 4. Merge results (AI takes precedence)
+  return {
+    ...legacyData,
+    ...aiData,
+    // Ensure we keep raw text and found dates
+    raw_text: text,
+    dates_found: legacyData.dates_found,
+    // Merge metadata if legacy found anything (unlikely, but safe)
+    metadata: aiData.metadata || {},
+  };
 }

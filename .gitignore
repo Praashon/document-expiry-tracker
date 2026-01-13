@@ -1,48 +1,65 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
 .yarn/*
 !.yarn/patches
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
 
-# testing
-/coverage
+# Build outputs
+.next/
+out/
+build/
+dist/
 
-# next.js
-/.next/
-/out/
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
 
-# production
-/build
-
-# misc
-.DS_Store
-*.pem
-
-# debug
+# Debug logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
-
-# vercel
-.vercel
-
-# typescript
+# TypeScript
 *.tsbuildinfo
 next-env.d.ts
 
-#supabase
-supabase
+# Testing
+coverage/
+.nyc_output/
 
-#my_texts
-./code_explanations.my_texts
-./Thinking.txt
+# IDE and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Vercel
+.vercel
+
+# Supabase local config
+supabase/
+
+# Certificates
+*.pem
+
+# Personal notes and drafts
+*.my_texts
+Thinking.txt
+notes.txt
+TODO.txt

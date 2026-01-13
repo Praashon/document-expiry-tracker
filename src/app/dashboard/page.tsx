@@ -313,21 +313,48 @@ export default function DashboardPage() {
   const handleDeleteConfirm = async () => {
     if (!selectedDocument?.id) return;
 
+    const documentToDelete = selectedDocument;
+    const documentTitle = documentToDelete.title;
+
+    // Optimistically remove the document from the UI immediately
+    setDocuments((prevDocs) =>
+      prevDocs.filter((doc) => doc.id !== documentToDelete.id),
+    );
+    setIsDeleteModalOpen(false);
+    setSelectedDocument(null);
+    setOpenMenuId(null);
+
     try {
-      const response = await fetch(`/api/documents/${selectedDocument.id}`, {
+      const response = await fetch(`/api/documents/${documentToDelete.id}`, {
         method: "DELETE",
       });
       const data = await response.json();
 
       if (data.success) {
-        handleRefresh();
+        addToast({
+          type: "success",
+          title: "Document Deleted",
+          message: `"${documentTitle}" has been permanently removed.`,
+        });
+      } else {
+        // Restore the document if deletion failed
+        setDocuments((prevDocs) => [...prevDocs, documentToDelete]);
+        addToast({
+          type: "error",
+          title: "Deletion Failed",
+          message: "Could not delete the document. Please try again.",
+        });
       }
     } catch (error) {
       console.error("Error deleting document:", error);
+      // Restore the document on error
+      setDocuments((prevDocs) => [...prevDocs, documentToDelete]);
+      addToast({
+        type: "error",
+        title: "Deletion Failed",
+        message: "An error occurred while deleting. Please try again.",
+      });
     }
-
-    setIsDeleteModalOpen(false);
-    setSelectedDocument(null);
   };
 
   if (isLoading) {
@@ -470,7 +497,7 @@ export default function DashboardPage() {
             </motion.div>
           ) : (
             <div className="space-y-2">
-              <AnimatePresence mode="popLayout">
+              <AnimatePresence mode="popLayout" initial={false}>
                 {filteredDocuments.map((doc, index) => {
                   const status = getDocumentStatus(doc.expiration_date);
                   const daysUntil = getDaysUntilExpiration(doc.expiration_date);
@@ -481,11 +508,25 @@ export default function DashboardPage() {
                   return (
                     <motion.div
                       key={doc.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, x: -10 }}
-                      transition={{ delay: index * 0.03 }}
-                      className="group bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 hover:border-[#A8BBA3]/50 transition-all"
+                      layout
+                      initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{
+                        opacity: 0,
+                        x: -100,
+                        scale: 0.9,
+                        transition: { duration: 0.3, ease: "easeInOut" },
+                      }}
+                      whileHover={{
+                        boxShadow: "0 4px 12px rgba(168, 187, 163, 0.15)",
+                        borderColor: "rgba(168, 187, 163, 0.5)",
+                        transition: { duration: 0.2, ease: "easeOut" },
+                      }}
+                      transition={{
+                        delay: index * 0.03,
+                        layout: { duration: 0.3, ease: "easeInOut" },
+                      }}
+                      className="group bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 transition-colors"
                     >
                       <div className="flex items-center gap-4 p-4">
                         <div
