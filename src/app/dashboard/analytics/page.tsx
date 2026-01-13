@@ -249,13 +249,13 @@ export default function AnalyticsPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-neutral-50 dark:bg-neutral-950">
+    <div className="flex min-h-screen bg-neutral-50 dark:bg-neutral-950 overflow-x-hidden">
       <Sidebar />
 
       <div className="flex-1 md:ml-16">
         <Header user={user} sidebarCollapsed={true} />
 
-        <main className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto">
+        <main className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto overflow-x-hidden">
           {/* Page Header */}
           <motion.div
             initial={{ opacity: 0, y: -10 }}
