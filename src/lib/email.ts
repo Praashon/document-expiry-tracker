@@ -21,29 +21,6 @@ function getTransporter(): nodemailer.Transporter {
   return transporter;
 }
 
-export async function sendWelcomeEmail(
-  email: string,
-  name: string
-): Promise<boolean> {
-  try {
-    const mailTransporter = getTransporter();
-
-    const html = generateWelcomeEmailHtml(name, email);
-
-    await mailTransporter.sendMail({
-      from: `DocTracker <${process.env.GMAIL_USER}>`,
-      to: email,
-      subject: "🎉 Welcome to DocTracker - Never Miss an Expiry Date Again!",
-      html: html,
-    });
-
-    return true;
-  } catch (error) {
-    console.error(`Failed to send welcome email to ${email}:`, error);
-    return false;
-  }
-}
-
 export async function sendExpiryReminderEmail(
   email: string,
   name: string,
@@ -102,121 +79,6 @@ function getSubjectLine(documentName: string, daysUntil: number): string {
   }
 }
 
-function generateWelcomeEmailHtml(name: string, email: string): string {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    </head>
-    <body style="margin: 0; padding: 0; background-color: #F3F4F6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #F3F4F6; padding: 40px 20px;">
-        <tr>
-          <td align="center">
-            <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; background-color: #FFFFFF; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-              <!-- Header -->
-              <tr>
-                <td style="background: linear-gradient(135deg, #A8BBA3 0%, #8FA58F 100%); padding: 48px 32px; text-align: center;">
-                  <div style="font-size: 56px; margin-bottom: 16px;">🎉</div>
-                  <h1 style="margin: 0; color: #FFFFFF; font-size: 28px; font-weight: 700;">Welcome to DocTracker!</h1>
-                  <p style="margin: 12px 0 0 0; color: rgba(255,255,255,0.9); font-size: 16px;">Your personal document expiration assistant</p>
-                </td>
-              </tr>
-
-              <!-- Content -->
-              <tr>
-                <td style="padding: 40px 32px;">
-                  <p style="margin: 0 0 24px 0; color: #374151; font-size: 18px; line-height: 1.6;">
-                    Hi ${name}! 👋
-                  </p>
-
-                  <p style="margin: 0 0 24px 0; color: #374151; font-size: 16px; line-height: 1.6;">
-                    Thank you for joining DocTracker. We're excited to help you stay on top of all your important document expiration dates.
-                  </p>
-
-                  <!-- Features -->
-                  <div style="background-color: #F9FAFB; border-radius: 12px; padding: 24px; margin-bottom: 32px;">
-                    <h3 style="margin: 0 0 16px 0; color: #111827; font-size: 16px; font-weight: 600;">📋 What you can do with DocTracker:</h3>
-                    <ul style="margin: 0; padding-left: 20px; color: #4B5563; line-height: 1.8;">
-                      <li>Track expiration dates for passports, licenses, insurance & more</li>
-                      <li>Get automatic email reminders at 30, 15, 7, and 1 day before expiry</li>
-                      <li>Upload and store your document copies securely</li>
-                      <li>View analytics and insights about your documents</li>
-                    </ul>
-                  </div>
-
-                  <!-- Reminder Schedule -->
-                  <div style="background-color: #F0FDF4; border-radius: 12px; padding: 24px; margin-bottom: 32px; border: 1px solid #BBF7D0;">
-                    <h3 style="margin: 0 0 16px 0; color: #166534; font-size: 16px; font-weight: 600;">📬 Your Automatic Reminder Schedule:</h3>
-                    <table width="100%" cellpadding="8" cellspacing="0" style="color: #15803D; font-size: 14px;">
-                      <tr>
-                        <td style="padding: 8px 0; border-bottom: 1px solid #BBF7D0;">📅 <strong>30 days</strong> before</td>
-                        <td style="padding: 8px 0; border-bottom: 1px solid #BBF7D0; text-align: right;">Advance Notice</td>
-                      </tr>
-                      <tr>
-                        <td style="padding: 8px 0; border-bottom: 1px solid #BBF7D0;">📋 <strong>15 days</strong> before</td>
-                        <td style="padding: 8px 0; border-bottom: 1px solid #BBF7D0; text-align: right;">Reminder</td>
-                      </tr>
-                      <tr>
-                        <td style="padding: 8px 0; border-bottom: 1px solid #BBF7D0;">⚠️ <strong>7 days</strong> before</td>
-                        <td style="padding: 8px 0; border-bottom: 1px solid #BBF7D0; text-align: right;">Warning</td>
-                      </tr>
-                      <tr>
-                        <td style="padding: 8px 0;">🚨 <strong>1 day</strong> before</td>
-                        <td style="padding: 8px 0; text-align: right;">Urgent Alert</td>
-                      </tr>
-                    </table>
-                  </div>
-
-                  <!-- CTA Button -->
-                  <table width="100%" cellpadding="0" cellspacing="0">
-                    <tr>
-                      <td align="center" style="padding: 8px 0;">
-                        <a href="${appUrl}/dashboard"
-                           style="display: inline-block; padding: 16px 48px; background: linear-gradient(135deg, #A8BBA3 0%, #8FA58F 100%); color: #FFFFFF; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
-                          Get Started - Add Your First Document
-                        </a>
-                      </td>
-                    </tr>
-                  </table>
-                </td>
-              </tr>
-
-              <!-- Tips -->
-              <tr>
-                <td style="padding: 0 32px 32px 32px;">
-                  <div style="background-color: #FEF3C7; border-radius: 12px; padding: 20px; border-left: 4px solid #F59E0B;">
-                    <p style="margin: 0; color: #92400E; font-size: 14px; line-height: 1.6;">
-                      <strong>💡 Pro Tip:</strong> Start by adding your most important documents like your passport, driver's license, or insurance policies. DocTracker will automatically remind you before they expire!
-                    </p>
-                  </div>
-                </td>
-              </tr>
-
-              <!-- Footer -->
-              <tr>
-                <td style="padding: 24px 32px; background-color: #F9FAFB; border-top: 1px solid #E5E7EB; text-align: center;">
-                  <p style="margin: 0 0 8px 0; color: #6B7280; font-size: 14px;">
-                    Questions? Just reply to this email - we're here to help!
-                  </p>
-                  <p style="margin: 0; color: #9CA3AF; font-size: 12px;">
-                    This email was sent to ${email}<br>
-                    <a href="${appUrl}/dashboard/profile?tab=settings" style="color: #6B7280; text-decoration: underline;">Manage notification preferences</a>
-                  </p>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-      </table>
-    </body>
-    </html>
-  `;
-}
-
 function getUrgencyConfig(daysUntil: number): {
   color: string;
   bgColor: string;
@@ -267,7 +129,14 @@ function generateReminderEmailHtml(
   daysUntil: number
 ): string {
   const config = getUrgencyConfig(daysUntil);
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+
+  // Dynamic URL for different deployment environments
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : undefined ||
+        process.env.URL || // Netlify
+        "http://localhost:3000"; // Development fallback
 
   const formattedDate = new Date(expiryDate).toLocaleDateString("en-US", {
     weekday: "long",

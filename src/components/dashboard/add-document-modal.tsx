@@ -243,12 +243,12 @@ export function AddDocumentModal({
       const formData = new FormData();
       formData.append("title", title.trim());
       formData.append("type", type);
-      if (expirationDate) formData.append("expiration_date", expirationDate);
-      if (reminderDate) formData.append("reminder_date", reminderDate);
+      if (expirationDate && expirationDate.trim()) formData.append("expiration_date", expirationDate);
+      if (reminderDate && reminderDate.trim()) formData.append("reminder_date", reminderDate);
       if (notes.trim()) formData.append("notes", notes.trim());
       if (documentNumber.trim())
         formData.append("document_number", documentNumber.trim());
-      if (issueDate) formData.append("issue_date", issueDate);
+      if (issueDate && issueDate.trim()) formData.append("issue_date", issueDate);
       if (issuingAuthority.trim())
         formData.append("issuing_authority", issuingAuthority.trim());
 
