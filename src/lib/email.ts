@@ -132,11 +132,10 @@ function generateReminderEmailHtml(
 
   // Dynamic URL for different deployment environments
   const appUrl =
-    process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : undefined ||
-        process.env.URL || // Netlify
-        "http://localhost:3000"; // Development fallback
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
+    process.env.URL || // Netlify
+    "http://localhost:3000"; // Development fallback
 
   const formattedDate = new Date(expiryDate).toLocaleDateString("en-US", {
     weekday: "long",
