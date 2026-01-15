@@ -9,9 +9,13 @@ export interface ExtractedDocumentData {
   title: string | null;
   type: string; // Changed from stringent union to string to allow AI's flexibility
   expiration_date: string | null;
+  issue_date: string | null; // Added for issue date extraction
+  name: string | null; // Primary name field extracted from document
   raw_text: string;
   dates_found: string[];
-  metadata?: Record<string, any>; // New field for dynamic data
+  confidence: number; // OCR confidence score (0-100)
+  low_confidence_warning?: string; // Warning message for low confidence extractions
+  metadata?: Record<string, any>; // Dynamic data field
 }
 
 let workerInstance: Worker | null = null;
@@ -28,7 +32,11 @@ export async function getOCRWorker(): Promise<Worker> {
   }
 
   isInitializing = true;
-  initPromise = createWorker("eng+nep", 1, {
+  // Multi-language OCR support
+  // Priority languages: English, Hindi, Nepali
+  // Additional: Dutch, Spanish, Chinese Simplified
+  const languages = "eng+hin+nep+nld+spa+chi_sim";
+  initPromise = createWorker(languages, 1, {
     langPath: "https://tessdata.projectnaptha.com/4.0.0",
   });
 
@@ -77,12 +85,27 @@ export async function performOCR(
 
 function extractDates(text: string): string[] {
   const datePatterns = [
+    // MM/DD/YYYY or MM-DD-YYYY
     /\b(0?[1-9]|1[0-2])[\/\-](0?[1-9]|[12]\d|3[01])[\/\-](19|20)\d{2}\b/g,
+    // DD/MM/YYYY or DD-MM-YYYY
     /\b(0?[1-9]|[12]\d|3[01])[\/\-](0?[1-9]|1[0-2])[\/\-](19|20)\d{2}\b/g,
+    // YYYY/MM/DD or YYYY-MM-DD
     /\b(19|20)\d{2}[\/\-](0?[1-9]|1[0-2])[\/\-](0?[1-9]|[12]\d|3[01])\b/g,
+    // DD.MM.YYYY (dot separator common in some regions)
+    /\b(0?[1-9]|[12]\d|3[01])\.(0?[1-9]|1[0-2])\.(19|20)\d{2}\b/g,
+    // Full month: January 15, 2025 or January 15 2025
     /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(0?[1-9]|[12]\d|3[01]),?\s+(19|20)\d{2}\b/gi,
+    // Full month: 15 January 2025
     /\b(0?[1-9]|[12]\d|3[01])\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(19|20)\d{2}\b/gi,
+    // Abbreviated month: Jan 15, 2025 or Jan. 15 2025
     /\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+(0?[1-9]|[12]\d|3[01]),?\s+(19|20)\d{2}\b/gi,
+    // Abbreviated month: 15 Jan 2025 or 15-Jan-2025
+    /\b(0?[1-9]|[12]\d|3[01])[\s\-](Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?[\s\-](19|20)\d{2}\b/gi,
+    // Ordinal dates: 1st January 2025, 2nd Feb 2025
+    /\b(0?[1-9]|[12]\d|3[01])(st|nd|rd|th)\s+(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+(19|20)\d{2}\b/gi,
+    // Space separated: DD MM YYYY
+    /\b(0?[1-9]|[12]\d|3[01])\s+(0?[1-9]|1[0-2])\s+(19|20)\d{2}\b/g,
+    // Nepali BS dates
     /\b(२०[७-९]\d)[\/\-](0?[1-9]|1[0-2])[\/\-](0?[1-9]|[12]\d|3[01])\b/g,
     /\b(0?[1-9]|[12]\d|3[01])[\/\-](0?[1-9]|1[0-2])[\/\-](२०[७-९]\d)\b/g,
   ];
@@ -99,41 +122,72 @@ function extractDates(text: string): string[] {
   return [...new Set(dates)];
 }
 
-function findExpirationDate(text: string, dates: string[]): string | null {
-  const expirationKeywords = [
-    "expir",
-    "valid until",
-    "valid through",
-    "valid thru",
-    "expires on",
-    "expiration date",
-    "exp date",
-    "exp:",
-    "due date",
-    "renewal date",
-    "end date",
-    "termination",
-    "maturity",
-    "मिति सम्म",
-    "अन्तिम मिति",
-    "समाप्ति",
-    "म्याद",
-  ];
-
+function findDateNearKeyword(
+  text: string,
+  dates: string[],
+  keywords: string[],
+  maxDistance: number = 100
+): string | null {
   const lowerText = text.toLowerCase();
 
-  for (const keyword of expirationKeywords) {
+  for (const keyword of keywords) {
     const keywordIndex = lowerText.indexOf(keyword.toLowerCase());
     if (keywordIndex !== -1) {
+      // Look for dates after the keyword first
       for (const date of dates) {
         const dateIndex = text.indexOf(date);
-        if (dateIndex > keywordIndex && dateIndex - keywordIndex < 100) {
+        if (dateIndex > keywordIndex && dateIndex - keywordIndex < maxDistance) {
+          return date;
+        }
+      }
+      // Also check for dates slightly before the keyword (label might be after date)
+      for (const date of dates) {
+        const dateIndex = text.indexOf(date);
+        if (dateIndex < keywordIndex && keywordIndex - dateIndex < 50) {
           return date;
         }
       }
     }
   }
 
+  return null;
+}
+
+function findExpirationDate(text: string, dates: string[]): string | null {
+  const expirationKeywords = [
+    "expir",
+    "valid until",
+    "valid through",
+    "valid thru",
+    "valid upto",
+    "valid up to",
+    "expires on",
+    "expiration date",
+    "date of expiry",
+    "exp date",
+    "exp:",
+    "exp.",
+    "due date",
+    "renewal date",
+    "end date",
+    "termination",
+    "maturity",
+    "date of expiration",
+    "validity",
+    // Nepali
+    "मिति सम्म",
+    "अन्तिम मिति",
+    "समाप्ति",
+    "म्याद",
+    "मान्य मिति",
+  ];
+
+  const foundDate = findDateNearKeyword(text, dates, expirationKeywords);
+  if (foundDate) {
+    return foundDate;
+  }
+
+  // Fallback: if multiple dates, return the latest one (likely expiry)
   if (dates.length > 0) {
     const parsedDates = dates
       .map((d) => {
@@ -150,6 +204,52 @@ function findExpirationDate(text: string, dates: string[]): string | null {
 
     if (parsedDates.length > 0) {
       parsedDates.sort((a, b) => b.parsed.getTime() - a.parsed.getTime());
+      return parsedDates[0].original;
+    }
+  }
+
+  return null;
+}
+
+function findIssueDate(text: string, dates: string[]): string | null {
+  const issueKeywords = [
+    "issue date",
+    "date of issue",
+    "issued on",
+    "issued:",
+    "issued",
+    "date issued",
+    "doi",
+    "issue:",
+    "issuance date",
+    // Nepali
+    "जारी मिति",
+    "जारी",
+    "प्रदान मिति",
+  ];
+
+  const foundDate = findDateNearKeyword(text, dates, issueKeywords);
+  if (foundDate) {
+    return foundDate;
+  }
+
+  // Fallback: if multiple dates, return the earliest one (likely issue date)
+  if (dates.length > 1) {
+    const parsedDates = dates
+      .map((d) => {
+        try {
+          return { original: d, parsed: new Date(d) };
+        } catch {
+          return null;
+        }
+      })
+      .filter((d) => d && !isNaN(d.parsed.getTime())) as {
+      original: string;
+      parsed: Date;
+    }[];
+
+    if (parsedDates.length > 1) {
+      parsedDates.sort((a, b) => a.parsed.getTime() - b.parsed.getTime());
       return parsedDates[0].original;
     }
   }
@@ -293,6 +393,10 @@ function detectDocumentType(
 
 function normalizeDate(dateStr: string): string | null {
   try {
+    if (!dateStr || dateStr.trim() === "") {
+      return null;
+    }
+
     const nepaliToEnglish: Record<string, string> = {
       "०": "0",
       "१": "1",
@@ -306,45 +410,95 @@ function normalizeDate(dateStr: string): string | null {
       "९": "9",
     };
 
-    let normalizedStr = dateStr;
+    let normalizedStr = dateStr.trim();
     for (const [nepali, english] of Object.entries(nepaliToEnglish)) {
       normalizedStr = normalizedStr.replace(new RegExp(nepali, "g"), english);
+    }
+
+    // Handle DD.MM.YYYY format (European/Argentine style)
+    const dotSeparated = normalizedStr.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+    if (dotSeparated) {
+      const [, day, month, year] = dotSeparated;
+      normalizedStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+
+    // Handle DD/MM/YYYY format
+    const slashSeparated = normalizedStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (slashSeparated) {
+      const [, day, month, year] = slashSeparated;
+      // Assume DD/MM/YYYY if day > 12, otherwise ambiguous but assume DD/MM
+      if (parseInt(day) > 12 || parseInt(month) <= 12) {
+        normalizedStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      }
+    }
+
+    // Handle partial date formats
+    // YYYY-MM format (e.g., "2022-05") - add day 01
+    if (/^\d{4}-\d{1,2}$/.test(normalizedStr)) {
+      normalizedStr = normalizedStr + "-01";
+    }
+    // YYYY format only - add month and day
+    if (/^\d{4}$/.test(normalizedStr)) {
+      normalizedStr = normalizedStr + "-01-01";
     }
 
     const date = new Date(normalizedStr);
     if (isNaN(date.getTime())) {
       return null;
     }
-    return date.toISOString().split("T")[0];
+
+    const isoDate = date.toISOString().split("T")[0];
+    
+    // Validate the final format is YYYY-MM-DD
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) {
+      return null;
+    }
+    
+    return isoDate;
   } catch {
     return null;
   }
 }
 
-export function extractDocumentData(text: string): ExtractedDocumentData {
+export function extractDocumentData(text: string, confidence: number = 0): ExtractedDocumentData {
   if (!text) {
     return {
       title: null,
       type: "Other",
       expiration_date: null,
+      issue_date: null,
+      name: null,
       raw_text: "",
       dates_found: [],
+      confidence: 0,
     };
   }
   const dates = extractDates(text);
   const expirationDate = findExpirationDate(text, dates);
+  const issueDate = findIssueDate(text, dates);
   const title = extractTitle(text);
   const documentType = detectDocumentType(text);
   const normalizedExpDate = expirationDate
     ? normalizeDate(expirationDate)
     : null;
+  const normalizedIssueDate = issueDate ? normalizeDate(issueDate) : null;
+
+  // Generate low confidence warning if needed
+  let lowConfidenceWarning: string | undefined;
+  if (confidence < 70 && confidence > 0) {
+    lowConfidenceWarning = `OCR confidence is low (${confidence.toFixed(0)}%). Please verify extracted fields.`;
+  }
 
   return {
     title,
     type: documentType,
     expiration_date: normalizedExpDate,
+    issue_date: normalizedIssueDate,
+    name: null, // Will be populated by AI
     raw_text: text.substring(0, 2000),
     dates_found: dates,
+    confidence,
+    low_confidence_warning: lowConfidenceWarning,
   };
 }
 
@@ -364,11 +518,50 @@ async function processWithAI(
     }
 
     const data = await response.json();
+    
+    // Helper to filter out "null" strings that AI sometimes returns
+    const cleanValue = (val: any): string | null => {
+      if (val === null || val === undefined) return null;
+      const str = String(val).trim();
+      if (str === "" || str.toLowerCase() === "null" || str.toLowerCase() === "undefined") {
+        return null;
+      }
+      return str;
+    };
+    
+    // Extract name from metadata or top-level if provided
+    const extractedName = cleanValue(data.name) || 
+      cleanValue(data.metadata?.name) || 
+      cleanValue(data.metadata?.full_name) || 
+      null;
+    
+    // Validate and normalize dates from AI
+    const validateDate = (dateStr: string | null | undefined): string | null => {
+      if (!dateStr) return null;
+      const cleaned = cleanValue(dateStr);
+      if (!cleaned) return null;
+      // Use the normalizeDate function to validate the date format
+      return normalizeDate(cleaned);
+    };
+    
+    // Clean the metadata object to remove null strings
+    const cleanedMetadata: Record<string, any> = {};
+    if (data.metadata) {
+      for (const [key, value] of Object.entries(data.metadata)) {
+        const cleaned = cleanValue(value);
+        if (cleaned !== null) {
+          cleanedMetadata[key] = cleaned;
+        }
+      }
+    }
+    
     return {
-      title: data.title,
-      type: data.type,
-      expiration_date: data.expiration_date,
-      metadata: data.metadata,
+      title: cleanValue(data.title),
+      type: cleanValue(data.type) || "Other",
+      expiration_date: validateDate(data.expiration_date),
+      issue_date: validateDate(data.issue_date || data.metadata?.issue_date),
+      name: extractedName,
+      metadata: cleanedMetadata,
     };
   } catch (error) {
     console.error("AI processing error:", error);
@@ -383,22 +576,81 @@ export async function processDocument(
   // 1. Perform OCR (Client-side)
   const ocrResult = await performOCR(file, onProgress);
   const text = ocrResult.text || "";
+  const confidence = ocrResult.confidence || 0;
 
-  // 2. Extract regex-based data (Legacy/Fallback)
-  const legacyData = extractDocumentData(text);
+  // 2. Extract regex-based data (Legacy/Fallback) with confidence
+  const legacyData = extractDocumentData(text, confidence);
 
   // 3. Process with AI (Server-side)
   // We notify progress as 100% done with OCR, now "Analyzing..."
   const aiData = await processWithAI(text);
 
-  // 4. Merge results (AI takes precedence)
+  // 4. Merge results (AI takes precedence for most fields)
   return {
     ...legacyData,
     ...aiData,
     // Ensure we keep raw text and found dates
     raw_text: text,
     dates_found: legacyData.dates_found,
+    // Keep confidence from OCR
+    confidence: confidence,
+    low_confidence_warning: legacyData.low_confidence_warning,
     // Merge metadata if legacy found anything (unlikely, but safe)
+    metadata: aiData.metadata || {},
+  };
+}
+
+// Process multiple files (for front/back document support)
+export async function processMultipleDocuments(
+  files: { front?: File; back?: File },
+  onProgress?: (progress: number) => void
+): Promise<ExtractedDocumentData> {
+  const results: { text: string; confidence: number }[] = [];
+  const totalFiles = (files.front ? 1 : 0) + (files.back ? 1 : 0);
+  let processedFiles = 0;
+
+  // Process front side
+  if (files.front) {
+    const ocrResult = await performOCR(files.front, (p) => {
+      onProgress?.(p * (1 / totalFiles));
+    });
+    results.push({
+      text: `--- FRONT SIDE ---\n${ocrResult.text}`,
+      confidence: ocrResult.confidence,
+    });
+    processedFiles++;
+  }
+
+  // Process back side
+  if (files.back) {
+    const ocrResult = await performOCR(files.back, (p) => {
+      onProgress?.(((processedFiles / totalFiles) + (p / 100) * (1 / totalFiles)) * 100);
+    });
+    results.push({
+      text: `\n--- BACK SIDE ---\n${ocrResult.text}`,
+      confidence: ocrResult.confidence,
+    });
+  }
+
+  // Combine text from both sides
+  const combinedText = results.map((r) => r.text).join("\n");
+  const avgConfidence =
+    results.reduce((sum, r) => sum + r.confidence, 0) / results.length;
+
+  // 2. Extract regex-based data with combined text
+  const legacyData = extractDocumentData(combinedText, avgConfidence);
+
+  // 3. Process with AI
+  const aiData = await processWithAI(combinedText);
+
+  // 4. Merge results
+  return {
+    ...legacyData,
+    ...aiData,
+    raw_text: combinedText,
+    dates_found: legacyData.dates_found,
+    confidence: avgConfidence,
+    low_confidence_warning: legacyData.low_confidence_warning,
     metadata: aiData.metadata || {},
   };
 }

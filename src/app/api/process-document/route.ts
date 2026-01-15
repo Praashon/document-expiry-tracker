@@ -4,20 +4,34 @@ import { callOpenRouter } from "@/lib/ai-service";
 const SYSTEM_PROMPT = `You are an expert document parser. Your job is to extract ALL structured information from the raw OCR text of a document.
 Please ignore any noise or garbage characters from the OCR.
 
-Return a JSON object with the following fields (if found):
-- title: A short, descriptive title for the document (e.g., "Driving License", "Passport", "Rent Agreement").
-- type: The most likely document type (one of: "Rent Agreement", "Insurance", "Subscription", "License", "Warranty", "Contract", "Citizenship", "PAN Card", "National ID", "Passport", "Driving License", "Voter ID", "Birth Certificate", "Other").
-- expiration_date: The expiration date in YYYY-MM-DD format (or null if not found/no expiry).
-- metadata: A nested object containing ALL other specific details found. Extract EVERY piece of information visible on the document, including but not limited to:
+Return a JSON object with the following fields:
+
+**CRITICAL FIELDS (extract these with highest priority):**
+- name: The full name of the document holder (REQUIRED - look for labels like "Name", "Full Name", "नाम", or the most prominent name on the document)
+- issue_date: The date the document was issued in YYYY-MM-DD format (look for: "Date of Issue", "Issue Date", "Issued On", "DOI", "जारी मिति", or the earlier date on the document)
+- expiration_date: The expiration/validity end date in YYYY-MM-DD format (look for: "Date of Expiry", "Valid Until", "Valid Through", "Expires On", "Expiry Date", "म्याद", "मान्य मिति सम्म", or the later date on the document)
+- title: A short, descriptive title for the document (e.g., "Driving License", "Passport", "Rent Agreement")
+- type: The most likely document type (one of: "Rent Agreement", "Insurance", "Subscription", "License", "Warranty", "Contract", "Citizenship", "PAN Card", "National ID", "Passport", "Driving License", "Voter ID", "Birth Certificate", "Other")
+
+**DATE EXTRACTION HINTS:**
+- If you see two dates, the EARLIER one is typically the issue_date and the LATER one is typically the expiration_date
+- Look for date labels in close proximity to the date values
+- Common issue date labels: "Issue Date", "DOI", "Date of Issue", "Issued", "जारी मिति"
+- Common expiry date labels: "Expiry", "Valid Until", "Expires", "Valid Through", "Valid Thru", "DOE", "म्याद"
+
+**FRONT/BACK DOCUMENT HANDLING:**
+- If the text contains "--- FRONT SIDE ---" and "--- BACK SIDE ---" markers, extract data from BOTH sections
+- Combine information from both sides to build a complete profile
+
+- metadata: A nested object containing ALL other specific details found:
 
     **Personal Information:**
-    - name / full_name: The full name of the person
     - date_of_birth: in YYYY-MM-DD format
     - place_of_birth: City/District of birth
     - gender / sex: Male, Female, Other
     - nationality: Country of citizenship
     - blood_group: e.g. A+, O-, B+, AB-
-    - height: e.g. "5'8\"" or "175 cm"
+    - height: e.g. "5'8" or "175 cm"
     - eye_color: e.g. Brown, Blue, Black
     - hair_color: e.g. Black, Brown, Blonde
     - complexion: e.g. Fair, Medium, Dark
@@ -43,7 +57,6 @@ Return a JSON object with the following fields (if found):
 
     **Document Information:**
     - document_number: Any ID number (passport number, license number, etc.)
-    - issue_date: in YYYY-MM-DD format
     - issuing_authority: e.g. "Department of Transport"
     - issue_place: Where the document was issued
     - citizenship_number
@@ -60,10 +73,11 @@ Return a JSON object with the following fields (if found):
     - email
     - any_other_field_found: Include ANY other information visible on the document
 
-IMPORTANT: Extract EVERY piece of text/data you can identify from the document. Do not skip any fields. The goal is to capture all information for future reference.
-
-Do not invent information. If a field is not found, simply omit it from the metadata.
-Ensure the response is valid JSON.`;
+IMPORTANT: 
+1. The name, issue_date, and expiration_date fields are TOP PRIORITY. Always try to extract these even if the labels are unclear.
+2. Extract EVERY piece of text/data you can identify. Do not skip any fields.
+3. Do not invent information. If a field is not found, omit it or set to null.
+4. Ensure the response is valid JSON.`;
 
 export async function POST(req: NextRequest) {
   try {

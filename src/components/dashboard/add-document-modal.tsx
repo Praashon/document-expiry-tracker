@@ -13,6 +13,7 @@ import {
   ArrowLeft,
   CheckCircle,
   AlertCircle,
+  AlertTriangle,
   Hash,
   Building,
   Home,
@@ -27,6 +28,7 @@ import {
   Package,
   Plus,
   Trash2,
+  RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,7 +37,14 @@ import {
   DOCUMENT_TYPE_CONFIG,
   DOCUMENT_TYPES_BY_CATEGORY,
 } from "@/lib/supabase";
-import { processDocument, type ExtractedDocumentData } from "@/lib/ocr";
+import { processDocument, processMultipleDocuments, type ExtractedDocumentData } from "@/lib/ocr";
+import { 
+  analyzeDocumentWithPuter, 
+  analyzeMultipleDocumentsWithPuter, 
+  loadPuterJS,
+  isPuterAuthenticated,
+  PuterAuthError 
+} from "@/lib/puter-ai";
 
 interface AddDocumentModalProps {
   isOpen: boolean;
@@ -90,10 +99,19 @@ export function AddDocumentModal({
     [],
   );
 
+  // Front/Back card support
+  type CardSide = "front" | "back" | "both";
+  const [cardSide, setCardSide] = useState<CardSide>("front");
+  const [frontFile, setFrontFile] = useState<File | null>(null);
+  const [backFile, setBackFile] = useState<File | null>(null);
+  const [activeDragZone, setActiveDragZone] = useState<"front" | "back" | null>(null);
+
   // OCR state
   const [ocrProcessed, setOcrProcessed] = useState(false);
   const [extractedData, setExtractedData] =
     useState<ExtractedDocumentData | null>(null);
+  const [ocrConfidence, setOcrConfidence] = useState<number>(0);
+  const [usedFallback, setUsedFallback] = useState(false); // Track if we fell back from Puter
 
   const resetForm = () => {
     setMode("select");
@@ -112,6 +130,13 @@ export function AddDocumentModal({
     setProcessingStatus("");
     setOcrProcessed(false);
     setExtractedData(null);
+    // Reset new states
+    setCardSide("front");
+    setFrontFile(null);
+    setBackFile(null);
+    setOcrConfidence(0);
+    setActiveDragZone(null);
+    setUsedFallback(false);
   };
 
   const handleClose = () => {
@@ -147,68 +172,194 @@ export function AddDocumentModal({
     }
   };
 
+  // Handle file change for front/back mode
+  const handleFrontBackFileChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    side: "front" | "back"
+  ) => {
+    if (e.target.files && e.target.files[0]) {
+      if (side === "front") {
+        setFrontFile(e.target.files[0]);
+      } else {
+        setBackFile(e.target.files[0]);
+      }
+      setError(null);
+    }
+  };
+
   const processWithOCR = async () => {
-    if (!file) {
+    // Validate files based on card side mode
+    if (cardSide === "front" || cardSide === "back") {
+      const targetFile = cardSide === "front" ? (frontFile || file) : (backFile || file);
+      if (!targetFile) {
+        setError("Please upload a file first");
+        return;
+      }
+    } else if (cardSide === "both") {
+      if (!frontFile && !backFile) {
+        setError("Please upload at least one side of the document");
+        return;
+      }
+    } else if (!file) {
       setError("Please upload a file first");
       return;
     }
 
     setAutomaticStep("processing");
     setError(null);
-    setProcessingStatus("Initializing...");
+    setUsedFallback(false);
+
+    // Helper function to process with Puter.js (GPT-4o)
+    const processWithPuter = async () => {
+      setProcessingStatus("Loading Puter.js AI...");
+      await loadPuterJS();
+      
+      // Check if user is authenticated
+      const isAuth = await isPuterAuthenticated();
+      if (!isAuth) {
+        throw new PuterAuthError("Please sign in to Puter.js for best results");
+      }
+      
+      setProcessingStatus("Analyzing document with GPT-4o...");
+      
+      if (cardSide === "both" && (frontFile || backFile)) {
+        return await analyzeMultipleDocumentsWithPuter({
+          front: frontFile || undefined,
+          back: backFile || undefined,
+        });
+      } else {
+        const targetFile = cardSide === "front" ? (frontFile || file) : 
+                          cardSide === "back" ? (backFile || file) : file;
+        return await analyzeDocumentWithPuter(targetFile!);
+      }
+    };
+
+    // Helper function to process with Tesseract + OpenRouter (fallback)
+    const processWithTesseract = async () => {
+      setProcessingStatus("Loading OCR engine...");
+      let extracted: ExtractedDocumentData;
+      
+      if (cardSide === "both" && (frontFile || backFile)) {
+        extracted = await processMultipleDocuments(
+          { front: frontFile || undefined, back: backFile || undefined },
+          (progress) => {
+            if (progress < 30) {
+              setProcessingStatus("Processing front side...");
+            } else if (progress < 60) {
+              setProcessingStatus("Processing back side...");
+            } else if (progress < 90) {
+              setProcessingStatus("Extracting text...");
+            } else {
+              setProcessingStatus("Analyzing with AI...");
+            }
+          }
+        );
+      } else {
+        const targetFile = cardSide === "front" ? (frontFile || file) : 
+                          cardSide === "back" ? (backFile || file) : file;
+        extracted = await processDocument(targetFile!, (progress) => {
+          if (progress < 50) {
+            setProcessingStatus("Analyzing document...");
+          } else if (progress < 90) {
+            setProcessingStatus("Extracting text...");
+          } else {
+            setProcessingStatus("Processing with AI...");
+          }
+        });
+      }
+      return extracted;
+    };
 
     try {
-      setProcessingStatus("Loading language data...");
+      let puterResult = null;
+      let tesseractResult: ExtractedDocumentData | null = null;
+      
+      // Try Puter.js first (best quality)
+      try {
+        puterResult = await processWithPuter();
+      } catch (puterErr) {
+        console.log("Puter.js not available, falling back to Tesseract:", puterErr);
+        setUsedFallback(true);
+        // Fall back to Tesseract + OpenRouter
+        tesseractResult = await processWithTesseract();
+      }
 
-      const extracted = await processDocument(file, (progress) => {
-        if (progress < 50) {
-          setProcessingStatus("Analyzing document...");
-        } else if (progress < 90) {
-          setProcessingStatus("Extracting text...");
-        } else {
-          setProcessingStatus("Processing results...");
-        }
-      });
+      if (puterResult) {
+        // Process Puter result
+        setOcrConfidence(95);
+        
+        if (puterResult.title) setTitle(puterResult.title);
+        if (puterResult.type) setType(puterResult.type as DocumentType);
+        if (puterResult.expiration_date) setExpirationDate(puterResult.expiration_date);
+        if (puterResult.issue_date) setIssueDate(puterResult.issue_date);
+        if (puterResult.document_number) setDocumentNumber(puterResult.document_number);
+        if (puterResult.issuing_authority) setIssuingAuthority(puterResult.issuing_authority);
 
-      setExtractedData(extracted);
-
-      if (extracted.title) setTitle(extracted.title);
-      if (extracted.type) setType(extracted.type as DocumentType);
-      if (extracted.expiration_date)
-        setExpirationDate(extracted.expiration_date);
-
-      // Populate metadata from AI result
-      // Populate metadata from AI result and auto-fill explicit fields
-      if (extracted.metadata) {
         const metaEntries: { key: string; value: string }[] = [];
-
-        for (const [keyRaw, valueRaw] of Object.entries(extracted.metadata)) {
-          const keyLower = keyRaw.toLowerCase().replace(/_/g, " ");
-          const value = String(valueRaw);
-
-          if (keyLower.includes("document number") || keyLower === "number") {
-            setDocumentNumber(value);
-            continue;
+        if (puterResult.name) {
+          metaEntries.push({ key: "Name", value: puterResult.name });
+        }
+        if (puterResult.metadata) {
+          for (const [keyRaw, valueRaw] of Object.entries(puterResult.metadata)) {
+            const value = String(valueRaw);
+            if (value && value !== "null" && value !== "undefined") {
+              metaEntries.push({
+                key: keyRaw.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
+                value,
+              });
+            }
           }
-          if (keyLower.includes("issue date") || keyLower === "issued on") {
-            setIssueDate(value);
-            continue;
-          }
-          if (
-            keyLower.includes("issuing authority") ||
-            keyLower.includes("issued by") ||
-            keyLower.includes("authority")
-          ) {
-            setIssuingAuthority(value);
-            continue;
-          }
+        }
+        setMetadata(metaEntries);
 
-          metaEntries.push({
-            key: keyRaw
-              .replace(/_/g, " ")
-              .replace(/\b\w/g, (l) => l.toUpperCase()), // Title Case
-            value,
-          });
+        const extractedData: ExtractedDocumentData = {
+          title: puterResult.title,
+          type: puterResult.type,
+          expiration_date: puterResult.expiration_date,
+          issue_date: puterResult.issue_date,
+          name: puterResult.name,
+          raw_text: puterResult.raw_response,
+          dates_found: [],
+          confidence: 95,
+          metadata: puterResult.metadata,
+        };
+        setExtractedData(extractedData);
+      } else if (tesseractResult) {
+        // Process Tesseract result
+        setOcrConfidence(tesseractResult.confidence || 0);
+        setExtractedData(tesseractResult);
+        
+        if (tesseractResult.title) setTitle(tesseractResult.title);
+        if (tesseractResult.type) setType(tesseractResult.type as DocumentType);
+        if (tesseractResult.expiration_date) setExpirationDate(tesseractResult.expiration_date);
+        if (tesseractResult.issue_date) setIssueDate(tesseractResult.issue_date);
+
+        const metaEntries: { key: string; value: string }[] = [];
+        if (tesseractResult.name) {
+          metaEntries.push({ key: "Name", value: tesseractResult.name });
+        }
+        if (tesseractResult.metadata) {
+          for (const [keyRaw, valueRaw] of Object.entries(tesseractResult.metadata)) {
+            const keyLower = keyRaw.toLowerCase().replace(/_/g, " ");
+            const value = String(valueRaw);
+            
+            if (!value || value === "null" || value === "undefined") continue;
+
+            if (keyLower.includes("document number") || keyLower === "number") {
+              setDocumentNumber(value);
+              continue;
+            }
+            if (keyLower.includes("issuing authority") || keyLower.includes("issued by")) {
+              setIssuingAuthority(value);
+              continue;
+            }
+            if (keyLower === "name" || keyLower === "full name") continue;
+
+            metaEntries.push({
+              key: keyRaw.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
+              value,
+            });
+          }
         }
         setMetadata(metaEntries);
       }
@@ -216,7 +367,7 @@ export function AddDocumentModal({
       setOcrProcessed(true);
       setAutomaticStep("review");
     } catch (err) {
-      console.error("OCR Error:", err);
+      console.error("Document Processing Error:", err);
       setError(
         err instanceof Error ? err.message : "Failed to process document",
       );
@@ -236,6 +387,40 @@ export function AddDocumentModal({
       return;
     }
 
+    // Helper to validate and format date strings
+    const validateDateFormat = (dateStr: string): string | null => {
+      if (!dateStr || !dateStr.trim()) return null;
+      const trimmed = dateStr.trim();
+      // Check if already in YYYY-MM-DD format
+      if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+        return trimmed;
+      }
+      // Try to parse and format - handle YYYY-MM format
+      if (/^\d{4}-\d{1,2}$/.test(trimmed)) {
+        return trimmed + "-01";
+      }
+      // Try to create a date and format it
+      try {
+        const date = new Date(trimmed);
+        if (!isNaN(date.getTime())) {
+          return date.toISOString().split("T")[0];
+        }
+      } catch {
+        // ignore
+      }
+      return null;
+    };
+
+    // Validate dates before submitting
+    const validExpDate = validateDateFormat(expirationDate);
+    const validIssueDate = validateDateFormat(issueDate);
+    const validReminderDate = validateDateFormat(reminderDate);
+
+    if (config.hasExpiry && expirationDate && !validExpDate) {
+      setError("Invalid expiration date format. Please use YYYY-MM-DD format.");
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
@@ -243,12 +428,12 @@ export function AddDocumentModal({
       const formData = new FormData();
       formData.append("title", title.trim());
       formData.append("type", type);
-      if (expirationDate && expirationDate.trim()) formData.append("expiration_date", expirationDate);
-      if (reminderDate && reminderDate.trim()) formData.append("reminder_date", reminderDate);
+      if (validExpDate) formData.append("expiration_date", validExpDate);
+      if (validReminderDate) formData.append("reminder_date", validReminderDate);
       if (notes.trim()) formData.append("notes", notes.trim());
       if (documentNumber.trim())
         formData.append("document_number", documentNumber.trim());
-      if (issueDate && issueDate.trim()) formData.append("issue_date", issueDate);
+      if (issueDate && validIssueDate) formData.append("issue_date", validIssueDate);
       if (issuingAuthority.trim())
         formData.append("issuing_authority", issuingAuthority.trim());
 
@@ -402,50 +587,216 @@ export function AddDocumentModal({
               {/* Automatic Mode - Upload */}
               {mode === "automatic" && automaticStep === "upload" && (
                 <div className="space-y-4">
-                  <div
-                    onDragEnter={handleDrag}
-                    onDragLeave={handleDrag}
-                    onDragOver={handleDrag}
-                    onDrop={handleDrop}
-                    className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all ${dragActive
-                      ? "border-[#A8BBA3] bg-[#A8BBA3]/5"
-                      : file
-                        ? "border-green-500 bg-green-50 dark:bg-green-900/10"
-                        : "border-neutral-300 dark:border-neutral-700 hover:border-neutral-400 dark:hover:border-neutral-600"
-                      }`}
-                  >
-                    <input
-                      type="file"
-                      onChange={handleFileChange}
-                      accept="image/*,.pdf"
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    />
-                    {file ? (
-                      <div className="space-y-2">
-                        <CheckCircle className="h-10 w-10 text-green-500 mx-auto" />
-                        <p className="font-medium text-neutral-900 dark:text-white">
-                          {file.name}
-                        </p>
-                        <p className="text-sm text-neutral-500">
-                          {(file.size / 1024 / 1024).toFixed(2)} MB
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <Upload className="h-10 w-10 text-neutral-400 mx-auto" />
-                        <p className="font-medium text-neutral-900 dark:text-white">
-                          Drop your document here
-                        </p>
-                        <p className="text-sm text-neutral-500">
-                          or click to browse
-                        </p>
-                      </div>
-                    )}
+                  {/* Card Side Selection */}
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
+                      Document Side
+                    </label>
+                    <div className="flex gap-2">
+                      {(["front", "back", "both"] as const).map((side) => (
+                        <button
+                          key={side}
+                          onClick={() => setCardSide(side)}
+                          className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                            cardSide === side
+                              ? "bg-[#A8BBA3] text-white"
+                              : "bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700"
+                          }`}
+                        >
+                          {side === "front" ? "Front Only" : side === "back" ? "Back Only" : "Both Sides"}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-neutral-500 mt-1.5">
+                      ID cards: Select &quot;Both Sides&quot; to scan front and back for complete data extraction
+                    </p>
                   </div>
+
+                  {/* Single upload for front/back mode */}
+                  {cardSide !== "both" && (
+                    <div
+                      onDragEnter={handleDrag}
+                      onDragLeave={handleDrag}
+                      onDragOver={handleDrag}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setDragActive(false);
+                        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                          if (cardSide === "front") {
+                            setFrontFile(e.dataTransfer.files[0]);
+                          } else {
+                            setBackFile(e.dataTransfer.files[0]);
+                          }
+                          setFile(e.dataTransfer.files[0]);
+                          setError(null);
+                        }
+                      }}
+                      className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all ${
+                        dragActive
+                          ? "border-[#A8BBA3] bg-[#A8BBA3]/5"
+                          : (cardSide === "front" ? frontFile : backFile) || file
+                            ? "border-green-500 bg-green-50 dark:bg-green-900/10"
+                            : "border-neutral-300 dark:border-neutral-700 hover:border-neutral-400 dark:hover:border-neutral-600"
+                      }`}
+                    >
+                      <input
+                        type="file"
+                        onChange={(e) => {
+                          handleFileChange(e);
+                          if (e.target.files && e.target.files[0]) {
+                            if (cardSide === "front") {
+                              setFrontFile(e.target.files[0]);
+                            } else {
+                              setBackFile(e.target.files[0]);
+                            }
+                          }
+                        }}
+                        accept="image/*,.pdf"
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      />
+                      {((cardSide === "front" ? frontFile : backFile) || file) ? (
+                        <div className="space-y-2">
+                          <CheckCircle className="h-10 w-10 text-green-500 mx-auto" />
+                          <p className="font-medium text-neutral-900 dark:text-white">
+                            {(cardSide === "front" ? frontFile : backFile)?.name || file?.name}
+                          </p>
+                          <p className="text-sm text-neutral-500">
+                            {(((cardSide === "front" ? frontFile : backFile) || file)!.size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <Upload className="h-10 w-10 text-neutral-400 mx-auto" />
+                          <p className="font-medium text-neutral-900 dark:text-white">
+                            Drop your document ({cardSide} side) here
+                          </p>
+                          <p className="text-sm text-neutral-500">
+                            or click to browse
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Dual upload for both sides */}
+                  {cardSide === "both" && (
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Front side upload */}
+                      <div
+                        onDragEnter={(e) => { e.preventDefault(); setActiveDragZone("front"); }}
+                        onDragLeave={(e) => { e.preventDefault(); setActiveDragZone(null); }}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          setActiveDragZone(null);
+                          if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                            setFrontFile(e.dataTransfer.files[0]);
+                            setError(null);
+                          }
+                        }}
+                        className={`relative border-2 border-dashed rounded-xl p-4 text-center transition-all ${
+                          activeDragZone === "front"
+                            ? "border-[#A8BBA3] bg-[#A8BBA3]/5"
+                            : frontFile
+                              ? "border-green-500 bg-green-50 dark:bg-green-900/10"
+                              : "border-neutral-300 dark:border-neutral-700"
+                        }`}
+                      >
+                        <input
+                          type="file"
+                          onChange={(e) => handleFrontBackFileChange(e, "front")}
+                          accept="image/*,.pdf"
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        />
+                        {frontFile ? (
+                          <div className="space-y-1">
+                            <CheckCircle className="h-6 w-6 text-green-500 mx-auto" />
+                            <p className="font-medium text-sm text-neutral-900 dark:text-white truncate">
+                              {frontFile.name}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setFrontFile(null); }}
+                              className="text-xs text-red-500 hover:text-red-600"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <Upload className="h-6 w-6 text-neutral-400 mx-auto" />
+                            <p className="font-medium text-sm text-neutral-900 dark:text-white">
+                              Front Side
+                            </p>
+                            <p className="text-xs text-neutral-500">Drop or click</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Back side upload */}
+                      <div
+                        onDragEnter={(e) => { e.preventDefault(); setActiveDragZone("back"); }}
+                        onDragLeave={(e) => { e.preventDefault(); setActiveDragZone(null); }}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          setActiveDragZone(null);
+                          if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                            setBackFile(e.dataTransfer.files[0]);
+                            setError(null);
+                          }
+                        }}
+                        className={`relative border-2 border-dashed rounded-xl p-4 text-center transition-all ${
+                          activeDragZone === "back"
+                            ? "border-[#A8BBA3] bg-[#A8BBA3]/5"
+                            : backFile
+                              ? "border-green-500 bg-green-50 dark:bg-green-900/10"
+                              : "border-neutral-300 dark:border-neutral-700"
+                        }`}
+                      >
+                        <input
+                          type="file"
+                          onChange={(e) => handleFrontBackFileChange(e, "back")}
+                          accept="image/*,.pdf"
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        />
+                        {backFile ? (
+                          <div className="space-y-1">
+                            <CheckCircle className="h-6 w-6 text-green-500 mx-auto" />
+                            <p className="font-medium text-sm text-neutral-900 dark:text-white truncate">
+                              {backFile.name}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setBackFile(null); }}
+                              className="text-xs text-red-500 hover:text-red-600"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <RotateCcw className="h-6 w-6 text-neutral-400 mx-auto" />
+                            <p className="font-medium text-sm text-neutral-900 dark:text-white">
+                              Back Side
+                            </p>
+                            <p className="text-xs text-neutral-500">Drop or click</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   <Button
                     onClick={processWithOCR}
-                    disabled={!file}
+                    disabled={
+                      cardSide === "both"
+                        ? !frontFile && !backFile
+                        : cardSide === "front"
+                          ? !frontFile && !file
+                          : !backFile && !file
+                    }
                     className="w-full bg-[#A8BBA3] hover:bg-[#96ab91] text-white h-11"
                   >
                     <Sparkles className="h-4 w-4 mr-2" />
@@ -475,6 +826,54 @@ export function AddDocumentModal({
               {(mode === "manual" ||
                 (mode === "automatic" && automaticStep === "review")) && (
                   <div className="space-y-5">
+                    {/* OCR Confidence Indicator */}
+                    {mode === "automatic" && ocrConfidence > 0 && (
+                      <div className={`flex items-center gap-2 p-3 rounded-lg text-sm ${
+                        ocrConfidence >= 70
+                          ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400"
+                          : ocrConfidence >= 50
+                            ? "bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-400"
+                            : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400"
+                      }`}>
+                        {ocrConfidence >= 70 ? (
+                          <CheckCircle className="h-4 w-4 shrink-0" />
+                        ) : (
+                          <AlertTriangle className="h-4 w-4 shrink-0" />
+                        )}
+                        <div>
+                          <span className="font-medium">
+                            OCR Confidence: {ocrConfidence.toFixed(0)}%
+                          </span>
+                          {ocrConfidence < 70 && (
+                            <span className="ml-1">
+                              — Please verify extracted fields carefully
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Low confidence warning from extraction */}
+                    {extractedData?.low_confidence_warning && (
+                      <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-amber-700 dark:text-amber-400 text-sm">
+                        <AlertTriangle className="h-4 w-4 shrink-0" />
+                        {extractedData.low_confidence_warning}
+                      </div>
+                    )}
+
+                    {/* Puter.js suggestion when fallback was used */}
+                    {mode === "automatic" && usedFallback && (
+                      <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-blue-700 dark:text-blue-400 text-sm">
+                        <Sparkles className="h-4 w-4 shrink-0" />
+                        <div>
+                          <span className="font-medium">Want better results?</span>
+                          <span className="ml-1">
+                            Sign in to <a href="https://puter.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-800 dark:hover:text-blue-300">Puter.js</a> for GPT-4o powered extraction.
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Document Type Selection */}
                     <div>
                       <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
