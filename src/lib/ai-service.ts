@@ -51,8 +51,13 @@ export async function callOpenRouter(
 
   if (!response.ok) {
     const error = await response.text();
-    console.error("OpenRouter API error:", error);
-    throw new Error(`OpenRouter API error: ${response.status}`);
+    console.error("OpenRouter API error:", {
+      status: response.status,
+      statusText: response.statusText,
+      error: error,
+      headers: Object.fromEntries(response.headers.entries())
+    });
+    throw new Error(`OpenRouter API error (${response.status}): ${error}`);
   }
 
   const data: OpenRouterResponse = await response.json();

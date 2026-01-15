@@ -85,8 +85,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Return the actual error message for debugging
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
-      { error: "Failed to process your message. Please try again." },
+      { error: `Failed to process your message: ${errorMessage}` },
       { status: 500 }
     );
   }
