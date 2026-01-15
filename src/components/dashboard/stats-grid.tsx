@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FileText, AlertCircle, CheckCircle, Clock } from "lucide-react";
 import { getDocumentStats } from "@/lib/document-actions";
 import { checkAuth } from "@/lib/auth-actions";
+import { useTranslations } from "next-intl";
 
 interface DocumentStats {
   total: number;
@@ -15,6 +16,7 @@ interface DocumentStats {
 }
 
 export function StatsGrid({ refresh }: { refresh: boolean }) {
+  const t = useTranslations("dashboard");
   const [stats, setStats] = useState<DocumentStats>({
     total: 0,
     valid: 0,
@@ -43,33 +45,33 @@ export function StatsGrid({ refresh }: { refresh: boolean }) {
 
   const statCards = [
     {
-      title: "Total Documents",
+      titleKey: "totalDocuments",
       value: stats.total.toString(),
-      description: "All tracked documents",
+      descriptionKey: "allTracked",
       icon: FileText,
       color: "text-blue-500",
       bgColor: "bg-blue-50 dark:bg-blue-900/10",
     },
     {
-      title: "Expiring Soon",
+      titleKey: "expiringSoon",
       value: stats.expiringSoon.toString(),
-      description: "Within 30 days",
+      descriptionKey: "within30Days",
       icon: Clock,
       color: "text-orange-500",
       bgColor: "bg-orange-50 dark:bg-orange-900/10",
     },
     {
-      title: "Expired",
+      titleKey: "expired",
       value: stats.expired.toString(),
-      description: "Action required",
+      descriptionKey: "actionRequired",
       icon: AlertCircle,
       color: "text-red-500",
       bgColor: "bg-red-50 dark:bg-red-900/10",
     },
     {
-      title: "Valid",
+      titleKey: "valid",
       value: stats.valid.toString(),
-      description: "Active documents",
+      descriptionKey: "activeDocuments",
       icon: CheckCircle,
       color: "text-[#A8BBA3]",
       bgColor: "bg-[#A8BBA3]/10 dark:bg-[#A8BBA3]/10",
@@ -99,11 +101,11 @@ export function StatsGrid({ refresh }: { refresh: boolean }) {
       className="grid gap-4 md:grid-cols-2 lg:grid-cols-4"
     >
       {statCards.map((stat) => (
-        <motion.div key={stat.title} variants={item}>
+        <motion.div key={stat.titleKey} variants={item}>
           <Card className="overflow-hidden border-none shadow-sm hover:shadow-md transition-shadow dark:bg-neutral-900/50">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-neutral-500 dark:text-neutral-400">
-                {stat.title}
+                {t(stat.titleKey)}
               </CardTitle>
               <div className={`p-2 rounded-full ${stat.bgColor}`}>
                 <stat.icon className={`h-4 w-4 ${stat.color}`} />
@@ -118,7 +120,7 @@ export function StatsGrid({ refresh }: { refresh: boolean }) {
                 )}
               </div>
               <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                {stat.description}
+                {t(stat.descriptionKey)}
               </p>
             </CardContent>
           </Card>

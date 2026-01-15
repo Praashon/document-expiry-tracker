@@ -11,6 +11,7 @@ import {
   ArrowRight,
   CheckCircle,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface AuthError {
   message?: string;
@@ -40,6 +41,7 @@ function GoogleIcon({ className }: { className?: string }) {
 }
 
 export default function RegisterPage() {
+  const t = useTranslations("auth");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -86,7 +88,7 @@ export default function RegisterPage() {
       console.error("[Google Sign In] Error:", authErr);
       setError(
         authErr.message ||
-        "Authentication failed. Please verify your credentials and try again."
+          "Authentication failed. Please verify your credentials and try again."
       );
       setIsGoogleLoading(false);
     }
@@ -168,7 +170,7 @@ export default function RegisterPage() {
                 <User className="w-6 h-6" />
               </motion.div>
               <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-white">
-                Account Registration
+                {t("register")}
               </h1>
               <p className="text-sm text-neutral-600 dark:text-neutral-400">
                 Create your DocTracker Enterprise account
@@ -234,7 +236,7 @@ export default function RegisterPage() {
                     htmlFor="email"
                     className="text-sm font-medium text-neutral-700 dark:text-neutral-300 ml-1"
                   >
-                    Email Address
+                    {t("email")}
                   </label>
                   <div className="relative group">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-400 group-focus-within:text-[#A8BBA3] transition-colors">
@@ -258,7 +260,7 @@ export default function RegisterPage() {
                     htmlFor="password"
                     className="text-sm font-medium text-neutral-700 dark:text-neutral-300 ml-1"
                   >
-                    Password
+                    {t("password")}
                   </label>
                   <div className="relative group">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-400 group-focus-within:text-[#A8BBA3] transition-colors">
@@ -312,12 +314,12 @@ export default function RegisterPage() {
             </form>
 
             <div className="text-sm text-center text-neutral-600 dark:text-neutral-400">
-              Already have an account?{" "}
+              {t("hasAccount")}{" "}
               <Link
                 href="/login"
                 className="font-semibold text-[#A8BBA3] hover:text-[#92a88d] hover:underline transition-all"
               >
-                Access Account
+                {t("signIn")}
               </Link>
             </div>
           </>

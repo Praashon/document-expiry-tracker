@@ -5,6 +5,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { ToastProvider } from "@/components/ui/toast";
 import { BackgroundBeams } from "@/components/ui/background-beams";
+import { LocaleProvider } from "@/i18n";
 
 export const metadata: Metadata = {
   title: "DocTracker - Document Expiry Management",
@@ -32,10 +33,12 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <div className="fixed inset-0 z-[-1] pointer-events-none">
-            <BackgroundBeams className="opacity-40" />
-          </div>
-          <ToastProvider>{children}</ToastProvider>
+          <LocaleProvider>
+            <div className="fixed inset-0 z-[-1] pointer-events-none">
+              <BackgroundBeams className="opacity-40" />
+            </div>
+            <ToastProvider>{children}</ToastProvider>
+          </LocaleProvider>
         </ThemeProvider>
       </body>
     </html>

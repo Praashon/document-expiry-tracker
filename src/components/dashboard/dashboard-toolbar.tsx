@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { Search, Plus, SlidersHorizontal, ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTranslations } from "next-intl";
 
 interface DashboardToolbarProps {
     searchQuery: string;
@@ -19,15 +20,17 @@ export function DashboardToolbar({
     setActiveTab,
     onAddDocument,
 }: DashboardToolbarProps) {
+    const t = useTranslations("dashboard");
+    
     return (
         <div className="flex flex-col gap-4 mb-8">
             <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
                 <div>
                     <h2 className="text-2xl font-bold bg-linear-to-r from-neutral-900 to-neutral-600 dark:from-white dark:to-neutral-400 bg-clip-text text-transparent">
-                        Documents
+                        {t("documentsTitle")}
                     </h2>
                     <p className="text-neutral-500 text-sm mt-1">
-                        Manage and track your important files
+                        {t("manageFiles")}
                     </p>
                 </div>
 
@@ -38,7 +41,7 @@ export function DashboardToolbar({
                         className="flex-1 md:flex-none bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 rounded-full px-6 shadow-lg shadow-neutral-900/10 dark:shadow-white/5 transition-all hover:scale-105 active:scale-95"
                     >
                         <Plus className="h-4 w-4 mr-2" />
-                        Add New
+                        {t("addNew")}
                     </Button>
                 </div>
             </div>
@@ -48,7 +51,7 @@ export function DashboardToolbar({
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400 group-focus-within:text-neutral-600 dark:group-focus-within:text-neutral-300 transition-colors" />
                     <input
                         type="text"
-                        placeholder="Search by name, type or ID..."
+                        placeholder={t("searchPlaceholder")}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="w-full pl-10 pr-4 py-2 bg-transparent rounded-xl text-sm focus:outline-none placeholder:text-neutral-400 text-neutral-900 dark:text-neutral-100"
@@ -74,9 +77,9 @@ export function DashboardToolbar({
                                     transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                                 />
                             )}
-                            {tab === "all" && "All Items"}
-                            {tab === "expiring" && "Expiring"}
-                            {tab === "identity" && "Identity"}
+                            {tab === "all" && t("allItems")}
+                            {tab === "expiring" && t("expiring")}
+                            {tab === "identity" && t("identity")}
                         </button>
                     ))}
                 </div>
@@ -84,3 +87,4 @@ export function DashboardToolbar({
         </div>
     );
 }
+

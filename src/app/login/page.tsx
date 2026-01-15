@@ -14,6 +14,7 @@ import {
   Shield,
   KeyRound,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface AuthError {
   message?: string;
@@ -46,6 +47,7 @@ type LoginStep = "credentials" | "2fa";
 
 function LoginPageContent() {
   const searchParams = useSearchParams();
+  const t = useTranslations("auth");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [totpCode, setTotpCode] = useState("");
@@ -55,7 +57,7 @@ function LoginPageContent() {
   const [loginStep, setLoginStep] = useState<LoginStep>("credentials");
   const [isOAuthFlow, setIsOAuthFlow] = useState(false);
   const [backupCodeWarning, setBackupCodeWarning] = useState<string | null>(
-    null,
+    null
   );
 
   // Check if redirected from OAuth callback with 2FA requirement
@@ -139,7 +141,7 @@ function LoginPageContent() {
       // Check if backup code was used
       if (data.method === "backup_code") {
         setBackupCodeWarning(
-          `Backup code used. You have ${data.remainingBackupCodes} backup codes remaining.`,
+          `Backup code used. You have ${data.remainingBackupCodes} backup codes remaining.`
         );
         // Brief delay to show the warning before redirect
         setTimeout(() => {
@@ -180,7 +182,7 @@ function LoginPageContent() {
       console.error("[Google Sign In] Error:", authErr);
       setError(
         authErr.message ||
-        "Authentication failed. Please verify your credentials and try again.",
+          "Authentication failed. Please verify your credentials and try again."
       );
       setIsGoogleLoading(false);
     }
@@ -227,7 +229,7 @@ function LoginPageContent() {
                 <Lock className="w-6 h-6" />
               </motion.div>
               <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-white">
-                Account Access
+                {t("accountAccess")}
               </h1>
               <p className="text-sm text-neutral-600 dark:text-neutral-400">
                 Access your DocTracker Enterprise dashboard
@@ -269,7 +271,7 @@ function LoginPageContent() {
                     htmlFor="email"
                     className="text-sm font-medium text-neutral-700 dark:text-neutral-300 ml-1"
                   >
-                    Email Address
+                    {t("email")}
                   </label>
                   <div className="relative group">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-400 group-focus-within:text-[#A8BBA3] transition-colors">
@@ -293,7 +295,7 @@ function LoginPageContent() {
                     htmlFor="password"
                     className="text-sm font-medium text-neutral-700 dark:text-neutral-300 ml-1"
                   >
-                    Password
+                    {t("password")}
                   </label>
                   <div className="relative group">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neutral-400 group-focus-within:text-[#A8BBA3] transition-colors">
@@ -336,7 +338,7 @@ function LoginPageContent() {
                     <Loader2 className="w-5 h-5 animate-spin" />
                   ) : (
                     <>
-                      Access Dashboard <ArrowRight className="w-4 h-4" />
+                      {t("accessDashboard")} <ArrowRight className="w-4 h-4" />
                     </>
                   )}
                 </button>
@@ -345,12 +347,12 @@ function LoginPageContent() {
 
             <div className="flex items-center justify-between text-sm">
               <div className="text-neutral-600 dark:text-neutral-400">
-                Don&apos;t have an account?{" "}
+                {t("noAccount")}{" "}
                 <Link
                   href="/register"
                   className="font-semibold text-[#A8BBA3] hover:text-[#92a88d] hover:underline transition-all"
                 >
-                  Create an account
+                  {t("createAccount")}
                 </Link>
               </div>
             </div>
@@ -360,7 +362,7 @@ function LoginPageContent() {
                 href="/forgot-password"
                 className="text-neutral-500 dark:text-neutral-400 hover:text-[#A8BBA3] transition-colors"
               >
-                Forgot your password?
+                {t("forgotPassword")}
               </Link>
             </div>
           </>

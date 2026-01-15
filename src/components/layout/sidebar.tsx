@@ -14,28 +14,36 @@ import {
   Menu,
   X,
   HelpCircle,
+  LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 
-const menuItems = [
+interface MenuItem {
+  icon: LucideIcon;
+  labelKey: string; // Translation key
+  href: string;
+}
+
+const menuItems: MenuItem[] = [
   {
     icon: LayoutDashboard,
-    label: "Dashboard",
+    labelKey: "dashboard",
     href: "/dashboard",
   },
   {
     icon: Bell,
-    label: "Reminders",
+    labelKey: "reminders",
     href: "/dashboard/reminders",
   },
   {
     icon: TrendingUp,
-    label: "Analytics",
+    labelKey: "analytics",
     href: "/dashboard/analytics",
   },
   {
     icon: HelpCircle,
-    label: "Help",
+    labelKey: "help",
     href: "/dashboard/help",
   },
 ];
@@ -50,6 +58,7 @@ export function Sidebar({
   onCollapsedChange,
 }: SidebarProps) {
   const pathname = usePathname();
+  const t = useTranslations("nav");
   const [internalCollapsed, setInternalCollapsed] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -124,7 +133,7 @@ export function Sidebar({
                     ? "bg-[#A8BBA3]/10 text-[#A8BBA3]"
                     : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:text-white dark:hover:bg-neutral-800",
                 )}
-                title={collapsed ? item.label : undefined}
+                title={collapsed ? t(item.labelKey) : undefined}
               >
                 {isActive && (
                   <motion.div
@@ -153,7 +162,7 @@ export function Sidebar({
                       exit={{ opacity: 0 }}
                       className="text-sm font-medium whitespace-nowrap"
                     >
-                      {item.label}
+                      {t(item.labelKey)}
                     </motion.span>
                   )}
                 </AnimatePresence>
@@ -260,7 +269,7 @@ export function Sidebar({
                           )}
                         />
                         <span className="text-sm font-medium">
-                          {item.label}
+                          {t(item.labelKey)}
                         </span>
                       </Link>
                     );

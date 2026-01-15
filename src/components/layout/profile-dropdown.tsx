@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { logoutUser } from "@/lib/auth-actions";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 interface ProfileDropdownProps {
   user: SupabaseUser | null;
@@ -23,20 +24,21 @@ export function ProfileDropdown({ user }: ProfileDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const t = useTranslations("nav");
 
   const identities = user?.identities || [];
   const googleIdentity = identities.find(
-    (i: { provider?: string }) => i.provider === "google",
+    (i: { provider?: string }) => i.provider === "google"
   ) as
     | {
-      provider?: string;
-      identity_data?: {
-        name?: string;
-        full_name?: string;
-        avatar_url?: string;
-        picture?: string;
-      };
-    }
+        provider?: string;
+        identity_data?: {
+          name?: string;
+          full_name?: string;
+          avatar_url?: string;
+          picture?: string;
+        };
+      }
     | undefined;
 
   const userName =
@@ -95,12 +97,12 @@ export function ProfileDropdown({ user }: ProfileDropdownProps) {
   const menuItems = [
     {
       icon: User,
-      label: "Profile",
+      label: t("profile"),
       onClick: handleProfileClick,
     },
     {
       icon: Settings,
-      label: "Settings",
+      label: t("settings"),
       onClick: handleSettingsClick,
     },
     {
@@ -110,7 +112,7 @@ export function ProfileDropdown({ user }: ProfileDropdownProps) {
     },
     {
       icon: LogOut,
-      label: "Logout",
+      label: t("logout"),
       onClick: handleLogout,
       variant: "danger" as const,
     },
@@ -152,8 +154,9 @@ export function ProfileDropdown({ user }: ProfileDropdownProps) {
         </div>
 
         <ChevronDown
-          className={`h-4 w-4 text-neutral-500 transition-transform duration-200 ${isOpen ? "rotate-180" : ""
-            }`}
+          className={`h-4 w-4 text-neutral-500 transition-transform duration-200 ${
+            isOpen ? "rotate-180" : ""
+          }`}
         />
       </Button>
 
@@ -196,16 +199,18 @@ export function ProfileDropdown({ user }: ProfileDropdownProps) {
                 <button
                   key={index}
                   onClick={item.onClick}
-                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${item.variant === "danger"
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors ${
+                    item.variant === "danger"
                       ? "text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/10"
                       : "text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                    }`}
+                  }`}
                 >
                   <item.icon
-                    className={`h-4 w-4 ${item.variant === "danger"
+                    className={`h-4 w-4 ${
+                      item.variant === "danger"
                         ? "text-red-500"
                         : "text-neutral-500 dark:text-neutral-400"
-                      }`}
+                    }`}
                   />
                   {item.label}
                 </button>

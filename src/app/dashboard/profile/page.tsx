@@ -43,6 +43,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { AIChat } from "@/components/chat/ai-chat";
 import { AvatarCropModal } from "@/components/dashboard/avatar-crop-modal";
+import { LanguageSwitcher } from "@/components/ui/language-switcher";
 
 interface ProfileData {
   email: string;
@@ -1506,6 +1507,24 @@ function ProfilePageContent() {
                       }}
                     />
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* Language Preferences */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/20">
+                      <Globe className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    </div>
+                    Language Preferences
+                  </CardTitle>
+                  <CardDescription>
+                    Choose your preferred language for the application
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <LanguageSwitcher />
                 </CardContent>
               </Card>
 
