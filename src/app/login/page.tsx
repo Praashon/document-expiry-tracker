@@ -343,13 +343,24 @@ function LoginPageContent() {
               </motion.div>
             </form>
 
-            <div className="text-sm text-center text-neutral-600 dark:text-neutral-400">
-              Don&apos;t have an account?{" "}
+            <div className="flex items-center justify-between text-sm">
+              <div className="text-neutral-600 dark:text-neutral-400">
+                Don&apos;t have an account?{" "}
+                <Link
+                  href="/register"
+                  className="font-semibold text-[#A8BBA3] hover:text-[#92a88d] hover:underline transition-all"
+                >
+                  Create an account
+                </Link>
+              </div>
+            </div>
+
+            <div className="text-sm text-center">
               <Link
-                href="/register"
-                className="font-semibold text-[#A8BBA3] hover:text-[#92a88d] hover:underline transition-all"
+                href="/forgot-password"
+                className="text-neutral-500 dark:text-neutral-400 hover:text-[#A8BBA3] transition-colors"
               >
-                Create an account
+                Forgot your password?
               </Link>
             </div>
           </>

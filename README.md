@@ -22,7 +22,7 @@
 | Auth       | Supabase Auth (Email/Password, Google OAuth, 2FA) |
 | OCR        | Tesseract.js                                      |
 | Animations | Framer Motion                                     |
-| DevOps     | Vercel, Vercel Cron Jobs                          |
+| DevOps     | Netlify, Netlify Scheduled Functions              |
 
 ---
 
@@ -177,14 +177,24 @@ Notifications are triggered daily via Vercel cron jobs. Users can customize thei
 
 ## Deployment
 
-### Vercel (Recommended)
+### Netlify (Recommended)
 
-1. Push your code to a GitHub repository
-2. Import the project in [Vercel](https://vercel.com)
-3. Add all environment variables in the Vercel dashboard
+This application is optimized for deployment on Netlify with server-side rendering and scheduled email notifications.
+
+**Quick Start**:
+
+1. Push your code to GitHub
+2. Import project in [Netlify](https://app.netlify.com)
+3. Configure environment variables
 4. Deploy
 
-The `vercel.json` file includes cron job configuration for automated daily notifications at 8:00 AM UTC.
+**Scheduled Notifications**: Automated daily email reminders run at **5:00 AM Nepal Time** via Netlify Scheduled Functions.
+
+📖 **For detailed deployment instructions**, see [NETLIFY_DEPLOYMENT.md](./NETLIFY_DEPLOYMENT.md)
+
+### Vercel (Alternative)
+
+The application can also be deployed on Vercel, but requires manual configuration of cron jobs.
 
 ### Supabase Setup
 
@@ -207,6 +217,16 @@ Contributions are welcome! Here's how you can help:
 5. **Open a Pull Request**
 
 Please ensure your code follows the existing style and passes linting.
+
+---
+
+## Documentation
+
+For comprehensive information about the project:
+
+- 📘 **[Complete Documentation](./DOCUMENTATION.md)** - Full technical documentation including architecture, API docs, and security
+- 🚀 **[Netlify Deployment Guide](./NETLIFY_DEPLOYMENT.md)** - Step-by-step deployment instructions with troubleshooting
+- 📋 **[Environment Variables](./env.example)** - Template for required configuration
 
 ---
 

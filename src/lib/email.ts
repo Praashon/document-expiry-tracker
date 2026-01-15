@@ -257,3 +257,118 @@ function generateReminderEmailHtml(
     </html>
   `;
 }
+
+export async function sendPasswordResetEmail(
+  email: string,
+  resetLink: string
+): Promise<boolean> {
+  try {
+    const mailTransporter = getTransporter();
+
+    const appUrl =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.URL ||
+      "http://localhost:3000";
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      </head>
+      <body style="margin: 0; padding: 0; background-color: #F3F4F6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #F3F4F6; padding: 40px 20px;">
+          <tr>
+            <td align="center">
+              <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; background-color: #FFFFFF; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+                
+                <!-- Header -->
+                <tr>
+                  <td style="background: linear-gradient(135deg, #A8BBA3 0%, #8FA58F 100%); padding: 32px; text-align: center;">
+                    <h1 style="margin: 0; color: #FFFFFF; font-size: 28px; font-weight: 700;">DocTracker</h1>
+                    <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px;">Password Reset Request</p>
+                  </td>
+                </tr>
+
+                <!-- Icon Section -->
+                <tr>
+                  <td style="padding: 40px 32px 24px 32px; text-align: center;">
+                    <div style="display: inline-block; width: 80px; height: 80px; background: linear-gradient(135deg, #A8BBA3 0%, #8FA58F 100%); border-radius: 50%; line-height: 80px;">
+                      <span style="font-size: 36px;">🔐</span>
+                    </div>
+                  </td>
+                </tr>
+
+                <!-- Content -->
+                <tr>
+                  <td style="padding: 0 32px 32px 32px;">
+                    <h2 style="margin: 0 0 16px 0; color: #111827; font-size: 24px; font-weight: 600; text-align: center;">
+                      Reset Your Password
+                    </h2>
+                    
+                    <p style="margin: 0 0 24px 0; color: #4B5563; font-size: 16px; line-height: 1.6; text-align: center;">
+                      We received a request to reset your password. Click the button below to create a new password for your account.
+                    </p>
+
+                    <!-- Action Button -->
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td align="center" style="padding: 8px 0 32px 0;">
+                          <a href="${resetLink}"
+                             style="display: inline-block; padding: 18px 48px; background: linear-gradient(135deg, #A8BBA3 0%, #8FA58F 100%); color: #FFFFFF; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 14px rgba(168, 187, 163, 0.4);">
+                            Reset Password
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <!-- Security Notice -->
+                    <div style="background-color: #FEF3C7; border-radius: 12px; padding: 16px 20px; margin-bottom: 24px; border-left: 4px solid #F59E0B;">
+                      <p style="margin: 0; color: #92400E; font-size: 14px; line-height: 1.5;">
+                        <strong>Security Notice:</strong> This link will expire in 1 hour. If you didn't request this password reset, please ignore this email or contact support.
+                      </p>
+                    </div>
+
+                    <!-- Alternative Link -->
+                    <p style="margin: 0; color: #6B7280; font-size: 13px; line-height: 1.6; text-align: center;">
+                      If the button doesn't work, copy and paste this link into your browser:
+                    </p>
+                    <p style="margin: 8px 0 0 0; color: #A8BBA3; font-size: 12px; word-break: break-all; text-align: center; background-color: #F9FAFB; padding: 12px; border-radius: 8px;">
+                      ${resetLink}
+                    </p>
+                  </td>
+                </tr>
+
+                <!-- Footer -->
+                <tr>
+                  <td style="padding: 24px 32px; background-color: #F9FAFB; border-top: 1px solid #E5E7EB;">
+                    <p style="margin: 0 0 8px 0; color: #6B7280; font-size: 12px; text-align: center;">
+                      This email was sent to you because a password reset was requested for your DocTracker account.
+                    </p>
+                    <p style="margin: 0; color: #9CA3AF; font-size: 12px; text-align: center;">
+                      <a href="${appUrl}" style="color: #A8BBA3; text-decoration: none;">DocTracker</a> • Secure Document Management
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+      </html>
+    `;
+
+    await mailTransporter.sendMail({
+      from: `DocTracker <${process.env.GMAIL_USER}>`,
+      to: email,
+      subject: "Reset Your DocTracker Password",
+      html: html,
+    });
+
+    return true;
+  } catch (error) {
+    console.error(`Failed to send password reset email to ${email}:`, error);
+    return false;
+  }
+}
