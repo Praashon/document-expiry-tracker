@@ -24,7 +24,7 @@ export async function callOpenRouter(
   }
 
   const body: any = {
-    model: "mistralai/mistral-small-3.1-24b-instruct:free",
+    model: "mistralai/devstral-2512:free",
     messages,
     max_tokens: maxTokens,
     temperature: temperature,
