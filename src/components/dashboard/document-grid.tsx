@@ -154,7 +154,7 @@ export function DocumentGrid({
                                                 e.stopPropagation();
                                                 setOpenMenuId(openMenuId === doc.id ? null : doc.id!);
                                             }}
-                                            className="p-2 rounded-xl text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                                            className="p-2 rounded-xl text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100"
                                         >
                                             <MoreVertical className="h-4 w-4" />
                                         </button>

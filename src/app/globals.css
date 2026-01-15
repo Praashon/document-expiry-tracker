@@ -16,7 +16,7 @@
 
   /* Custom Selection */
   ::selection {
-    @apply bg-[#A8BBA3]/30 text-[#A8BBA3] dark:text-[#A8BBA3];
+    @apply bg-[#A8BBA3]/30 text-neutral-900 dark:text-white;
   }
 }
 
