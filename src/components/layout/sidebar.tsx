@@ -9,8 +9,6 @@ import {
   Bell,
   TrendingUp,
   ShieldCheck,
-  ChevronLeft,
-  ChevronRight,
   Menu,
   X,
   HelpCircle,
@@ -21,7 +19,7 @@ import { useTranslations } from "next-intl";
 
 interface MenuItem {
   icon: LucideIcon;
-  labelKey: string; // Translation key
+  labelKey: string;
   href: string;
 }
 
@@ -83,20 +81,24 @@ export function Sidebar({
     <>
       <div
         className={cn(
-          "flex h-14 items-center border-b border-neutral-200 dark:border-neutral-800",
-          collapsed ? "justify-center px-2" : "justify-between px-4",
+          "flex h-14 items-center border-b border-neutral-200 dark:border-neutral-800 overflow-hidden transition-[padding] duration-300",
+          collapsed ? "justify-center px-0" : "justify-between px-4"
         )}
       >
-        <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="relative h-9 w-9 rounded-lg bg-linear-to-br from-[#A8BBA3] via-[#8FA58F] to-[#6B8E6B] flex items-center justify-center shadow-md shrink-0">
+        <Link href="/dashboard" className="flex items-center gap-2 min-w-0">
+          <motion.div
+            layout
+            className="relative h-9 w-9 rounded-lg bg-linear-to-br from-[#A8BBA3] via-[#8FA58F] to-[#6B8E6B] flex items-center justify-center shadow-md shrink-0 mx-auto"
+          >
             <ShieldCheck className="h-4 w-4 text-white" />
-          </div>
-          <AnimatePresence mode="wait">
+          </motion.div>
+          <AnimatePresence>
             {!collapsed && (
               <motion.span
-                initial={{ opacity: 0, width: 0 }}
-                animate={{ opacity: 1, width: "auto" }}
-                exit={{ opacity: 0, width: 0 }}
+                initial={{ opacity: 0, width: 0, marginLeft: 0 }}
+                animate={{ opacity: 1, width: "auto", marginLeft: 8 }}
+                exit={{ opacity: 0, width: 0, marginLeft: 0 }}
+                transition={{ duration: 0.15, ease: "easeOut" }}
                 className="text-lg font-bold bg-linear-to-r from-[#A8BBA3] to-[#6B8E6B] bg-clip-text text-transparent whitespace-nowrap overflow-hidden"
               >
                 DocTracker
@@ -104,15 +106,6 @@ export function Sidebar({
             )}
           </AnimatePresence>
         </Link>
-
-        {!collapsed && (
-          <button
-            onClick={() => setCollapsed(true)}
-            className="p-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors hidden md:flex"
-          >
-            <ChevronLeft className="h-4 w-4 text-neutral-500" />
-          </button>
-        )}
       </div>
 
       <div className="flex-1 py-4 overflow-y-auto">
@@ -122,16 +115,25 @@ export function Sidebar({
               pathname === item.href ||
               (item.href !== "/dashboard" && pathname.startsWith(item.href));
 
+            const SidebarLink = motion(Link);
+
             return (
-              <Link
+              <SidebarLink
                 key={item.href}
                 href={item.href}
+                initial={false}
+                animate={{
+                  paddingLeft: collapsed ? 22 : 12,
+                  paddingRight: collapsed ? 22 : 12,
+                  gap: collapsed ? 0 : 12,
+                }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
                 className={cn(
-                  "group flex items-center rounded-lg transition-all duration-200 relative",
-                  collapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5",
+                  "group flex items-center rounded-lg transition-colors duration-200 relative whitespace-nowrap overflow-hidden",
+                  "py-2.5",
                   isActive
                     ? "bg-[#A8BBA3]/10 text-[#A8BBA3]"
-                    : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:text-white dark:hover:bg-neutral-800",
+                    : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:text-white dark:hover:bg-neutral-800"
                 )}
                 title={collapsed ? t(item.labelKey) : undefined}
               >
@@ -140,48 +142,39 @@ export function Sidebar({
                     layoutId="sidebar-indicator"
                     className={cn(
                       "absolute left-0 top-1/2 -translate-y-1/2 w-1 bg-linear-to-b from-[#A8BBA3] to-[#8FA58F] rounded-r-full",
-                      collapsed ? "h-6" : "h-8",
+                      collapsed ? "h-6" : "h-8"
                     )}
                     transition={{ type: "spring", stiffness: 300, damping: 30 }}
                   />
                 )}
-                <item.icon
-                  className={cn(
-                    "shrink-0",
-                    collapsed ? "h-5 w-5" : "h-4 w-4",
-                    isActive
-                      ? "text-[#A8BBA3]"
-                      : "text-neutral-500 group-hover:text-neutral-700 dark:text-neutral-400 dark:group-hover:text-neutral-300",
-                  )}
-                />
-                <AnimatePresence mode="wait">
+                <div className="shrink-0 flex items-center justify-center">
+                  <item.icon
+                    className={cn(
+                      collapsed ? "h-5 w-5" : "h-4 w-4",
+                      isActive
+                        ? "text-[#A8BBA3]"
+                        : "text-neutral-500 group-hover:text-neutral-700 dark:text-neutral-400 dark:group-hover:text-neutral-300"
+                    )}
+                  />
+                </div>
+                <AnimatePresence>
                   {!collapsed && (
                     <motion.span
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="text-sm font-medium whitespace-nowrap"
+                      initial={{ opacity: 0, width: 0 }}
+                      animate={{ opacity: 1, width: "auto" }}
+                      exit={{ opacity: 0, width: 0 }}
+                      transition={{ duration: 0.15, ease: "easeOut" }}
+                      className="text-sm font-medium overflow-hidden"
                     >
                       {t(item.labelKey)}
                     </motion.span>
                   )}
                 </AnimatePresence>
-              </Link>
+              </SidebarLink>
             );
           })}
         </div>
       </div>
-
-      {collapsed && (
-        <div className="p-2 border-t border-neutral-200 dark:border-neutral-800 hidden md:block">
-          <button
-            onClick={() => setCollapsed(false)}
-            className="w-full p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors flex items-center justify-center"
-          >
-            <ChevronRight className="h-4 w-4 text-neutral-500" />
-          </button>
-        </div>
-      )}
     </>
   );
 
@@ -195,14 +188,18 @@ export function Sidebar({
         <Menu className="h-5 w-5 text-neutral-600 dark:text-neutral-400" />
       </button>
 
-      <aside
+      <motion.aside
+        initial={{ width: 64 }}
+        animate={{ width: collapsed ? 64 : 224 }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        onMouseEnter={() => setInternalCollapsed(false)}
+        onMouseLeave={() => setInternalCollapsed(true)}
         className={cn(
-          "hidden md:flex h-screen flex-col border-r border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900 fixed left-0 top-0 z-40 transition-all duration-300",
-          collapsed ? "w-16" : "w-56",
+          "hidden md:flex h-screen flex-col border-r border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900 fixed left-0 top-0 z-40 overflow-hidden"
         )}
       >
         {sidebarContent}
-      </aside>
+      </motion.aside>
 
       <AnimatePresence>
         {mobileOpen && (
@@ -254,7 +251,7 @@ export function Sidebar({
                           "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 relative",
                           isActive
                             ? "bg-[#A8BBA3]/10 text-[#A8BBA3]"
-                            : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:text-white dark:hover:bg-neutral-800",
+                            : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 dark:text-neutral-400 dark:hover:text-white dark:hover:bg-neutral-800"
                         )}
                       >
                         {isActive && (
@@ -265,7 +262,7 @@ export function Sidebar({
                             "h-4 w-4 shrink-0",
                             isActive
                               ? "text-[#A8BBA3]"
-                              : "text-neutral-500 dark:text-neutral-400",
+                              : "text-neutral-500 dark:text-neutral-400"
                           )}
                         />
                         <span className="text-sm font-medium">

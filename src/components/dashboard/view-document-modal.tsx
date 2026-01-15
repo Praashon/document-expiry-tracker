@@ -158,7 +158,6 @@ export function ViewDocumentModal({
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -167,7 +166,6 @@ export function ViewDocumentModal({
             className="absolute inset-0 bg-black/40 backdrop-blur-sm"
           />
 
-          {/* Modal */}
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -175,15 +173,18 @@ export function ViewDocumentModal({
             transition={{ duration: 0.2 }}
             className="relative w-full max-w-md max-h-[90vh] bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
           >
-            {/* Header */}
             <div
-              className={`p-5 ${config?.bgColor || "bg-neutral-100 dark:bg-neutral-800"}`}
+              className={`p-5 ${
+                config?.bgColor || "bg-neutral-100 dark:bg-neutral-800"
+              }`}
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 rounded-xl bg-white/60 dark:bg-neutral-800/60">
                     <TypeIcon
-                      className={`h-6 w-6 ${config?.color || "text-neutral-600"}`}
+                      className={`h-6 w-6 ${
+                        config?.color || "text-neutral-600"
+                      }`}
                     />
                   </div>
                   <div>
@@ -211,8 +212,8 @@ export function ViewDocumentModal({
                       daysUntil < 0
                         ? "text-red-600 dark:text-red-400"
                         : daysUntil <= 30
-                          ? "text-orange-600 dark:text-orange-400"
-                          : "text-neutral-600 dark:text-neutral-400"
+                        ? "text-orange-600 dark:text-orange-400"
+                        : "text-neutral-600 dark:text-neutral-400"
                     }`}
                   >
                     {daysUntil < 0
@@ -223,9 +224,7 @@ export function ViewDocumentModal({
               </div>
             </div>
 
-            {/* Content */}
             <div className="p-5 space-y-4 overflow-y-auto flex-1">
-              {/* Document Number */}
               {document.document_number && (
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-neutral-100 dark:bg-neutral-800">
@@ -240,7 +239,6 @@ export function ViewDocumentModal({
                 </div>
               )}
 
-              {/* Issue Date */}
               {document.issue_date && (
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-neutral-100 dark:bg-neutral-800">
@@ -255,7 +253,6 @@ export function ViewDocumentModal({
                 </div>
               )}
 
-              {/* Expiration Date */}
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-neutral-100 dark:bg-neutral-800">
                   <Calendar className="h-4 w-4 text-neutral-500" />
@@ -270,7 +267,6 @@ export function ViewDocumentModal({
                 </div>
               </div>
 
-              {/* Issuing Authority */}
               {document.issuing_authority && (
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-neutral-100 dark:bg-neutral-800">
@@ -287,7 +283,6 @@ export function ViewDocumentModal({
                 </div>
               )}
 
-              {/* Reminder Date */}
               {document.reminder_date && (
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-neutral-100 dark:bg-neutral-800">
@@ -302,7 +297,6 @@ export function ViewDocumentModal({
                 </div>
               )}
 
-              {/* Notes */}
               {document.notes && (
                 <div className="pt-2">
                   <p className="text-xs text-neutral-500 mb-1">Notes</p>
@@ -312,7 +306,6 @@ export function ViewDocumentModal({
                 </div>
               )}
 
-              {/* Additional Details from Metadata */}
               {document.metadata &&
                 Object.keys(document.metadata).length > 0 && (
                   <div className="pt-4">
@@ -326,7 +319,6 @@ export function ViewDocumentModal({
                       {Object.entries(document.metadata).map(([key, value]) => {
                         if (!value) return null;
 
-                        // Determine icon based on key
                         const keyLower = key.toLowerCase();
                         let IconComponent: React.ElementType = Info;
                         if (
@@ -401,7 +393,6 @@ export function ViewDocumentModal({
                           IconComponent = CarIcon;
                         }
 
-                        // Format the key for display
                         const displayKey = key
                           .replace(/_/g, " ")
                           .replace(/\b\w/g, (l) => l.toUpperCase());
@@ -426,7 +417,6 @@ export function ViewDocumentModal({
                   </div>
                 )}
 
-              {/* Attached File */}
               {document.file_name && (
                 <div className="pt-2">
                   <p className="text-xs text-neutral-500 mb-2">Attachment</p>
@@ -459,7 +449,6 @@ export function ViewDocumentModal({
                 </div>
               )}
 
-              {/* Metadata */}
               <div className="pt-3 border-t border-neutral-200 dark:border-neutral-800 flex items-center justify-between text-xs text-neutral-400">
                 <span>
                   Created:{" "}
@@ -476,7 +465,6 @@ export function ViewDocumentModal({
               </div>
             </div>
 
-            {/* Footer */}
             <div className="p-5 pt-0">
               <Button variant="outline" onClick={onClose} className="w-full">
                 Close

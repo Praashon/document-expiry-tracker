@@ -23,7 +23,7 @@ interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
-  timestamp: Date | string; // Allow string for hydration
+  timestamp: Date | string;
   isOutOfScope?: boolean;
   isError?: boolean;
 }
@@ -31,7 +31,7 @@ interface Message {
 interface ChatSession {
   id: string;
   title: string;
-  date: string; // ISO string
+  date: string;
   messages: Message[];
 }
 
@@ -78,7 +78,6 @@ export function AIChat({
         setIsConfigured(false);
       });
 
-    // Load history
     const saved = localStorage.getItem("doc_tracker_chat_history");
     if (saved) {
       try {
@@ -91,7 +90,10 @@ export function AIChat({
 
   useEffect(() => {
     if (sessions.length > 0) {
-      localStorage.setItem("doc_tracker_chat_history", JSON.stringify(sessions));
+      localStorage.setItem(
+        "doc_tracker_chat_history",
+        JSON.stringify(sessions)
+      );
     }
   }, [sessions]);
 
@@ -112,7 +114,9 @@ export function AIChat({
 
     const newSession: ChatSession = {
       id: generateId(),
-      title: messages[0].content.slice(0, 30) + (messages[0].content.length > 30 ? "..." : ""),
+      title:
+        messages[0].content.slice(0, 30) +
+        (messages[0].content.length > 30 ? "..." : ""),
       date: new Date().toISOString(),
       messages: messages,
     };
@@ -213,16 +217,21 @@ export function AIChat({
   };
 
   const formatTime = (date: Date | string) => {
-    return new Date(date).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return new Date(date).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString([], { month: "short", day: "numeric" });
+    return new Date(dateStr).toLocaleDateString([], {
+      month: "short",
+      day: "numeric",
+    });
   };
 
   const chatContent = (
     <div className="flex flex-col h-full bg-white dark:bg-neutral-900">
-      {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 z-10">
         <div className="flex items-center gap-3">
           {showHistory ? (
@@ -330,14 +339,13 @@ export function AIChat({
         </div>
       ) : (
         <>
-          {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {!isConfigured && isConfigured !== null && (
               <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-amber-700 dark:text-amber-400 text-sm">
                 <AlertCircle className="h-4 w-4 shrink-0" />
                 <span>
-                  AI Assistant is not configured. Please add OPENROUTER_API_KEY to
-                  your environment variables.
+                  AI Assistant is not configured. Please add OPENROUTER_API_KEY
+                  to your environment variables.
                 </span>
               </div>
             )}
@@ -351,11 +359,10 @@ export function AIChat({
                   How can I help you?
                 </h4>
                 <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-6 max-w-xs mx-auto">
-                  Ask me anything about DocTracker - managing documents, settings,
-                  security, and more.
+                  Ask me anything about DocTracker - managing documents,
+                  settings, security, and more.
                 </p>
 
-                {/* Suggested questions */}
                 <div className="space-y-2">
                   <p className="text-xs text-neutral-400 dark:text-neutral-500 uppercase tracking-wider">
                     Suggested questions
@@ -383,18 +390,20 @@ export function AIChat({
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -10 }}
                   transition={{ duration: 0.2 }}
-                  className={`flex gap-3 ${message.role === "user" ? "flex-row-reverse" : ""
-                    }`}
+                  className={`flex gap-3 ${
+                    message.role === "user" ? "flex-row-reverse" : ""
+                  }`}
                 >
                   <div
-                    className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${message.role === "user"
-                      ? "bg-[#A8BBA3] text-white"
-                      : message.isError
+                    className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                      message.role === "user"
+                        ? "bg-[#A8BBA3] text-white"
+                        : message.isError
                         ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
                         : message.isOutOfScope
-                          ? "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400"
-                          : "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400"
-                      }`}
+                        ? "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400"
+                        : "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400"
+                    }`}
                   >
                     {message.role === "user" ? (
                       <User className="h-4 w-4" />
@@ -404,24 +413,29 @@ export function AIChat({
                   </div>
 
                   <div
-                    className={`flex-1 max-w-[80%] ${message.role === "user" ? "text-right" : ""
-                      }`}
+                    className={`flex-1 max-w-[80%] ${
+                      message.role === "user" ? "text-right" : ""
+                    }`}
                   >
                     <div
-                      className={`inline-block px-4 py-2.5 rounded-2xl text-sm ${message.role === "user"
-                        ? "bg-[#A8BBA3] text-white rounded-tr-sm"
-                        : message.isError
+                      className={`inline-block px-4 py-2.5 rounded-2xl text-sm ${
+                        message.role === "user"
+                          ? "bg-[#A8BBA3] text-white rounded-tr-sm"
+                          : message.isError
                           ? "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 rounded-tl-sm"
                           : message.isOutOfScope
-                            ? "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-tl-sm"
-                            : "bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 rounded-tl-sm"
-                        }`}
+                          ? "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-tl-sm"
+                          : "bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 rounded-tl-sm"
+                      }`}
                     >
-                      <div className="whitespace-pre-wrap">{message.content}</div>
+                      <div className="whitespace-pre-wrap">
+                        {message.content}
+                      </div>
                     </div>
                     <div
-                      className={`text-xs text-neutral-400 mt-1 ${message.role === "user" ? "text-right" : ""
-                        }`}
+                      className={`text-xs text-neutral-400 mt-1 ${
+                        message.role === "user" ? "text-right" : ""
+                      }`}
                     >
                       {formatTime(message.timestamp)}
                     </div>

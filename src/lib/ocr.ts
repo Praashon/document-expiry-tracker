@@ -7,15 +7,15 @@ export interface OCRResult {
 
 export interface ExtractedDocumentData {
   title: string | null;
-  type: string; // Changed from stringent union to string to allow AI's flexibility
+  type: string;
   expiration_date: string | null;
-  issue_date: string | null; // Added for issue date extraction
-  name: string | null; // Primary name field extracted from document
+  issue_date: string | null;
+  name: string | null;
   raw_text: string;
   dates_found: string[];
-  confidence: number; // OCR confidence score (0-100)
-  low_confidence_warning?: string; // Warning message for low confidence extractions
-  metadata?: Record<string, any>; // Dynamic data field
+  confidence: number;
+  low_confidence_warning?: string;
+  metadata?: Record<string, any>;
 }
 
 let workerInstance: Worker | null = null;
@@ -32,9 +32,7 @@ export async function getOCRWorker(): Promise<Worker> {
   }
 
   isInitializing = true;
-  // Multi-language OCR support
-  // Priority languages: English, Hindi, Nepali
-  // Additional: Dutch, Spanish, Chinese Simplified
+  isInitializing = true;
   const languages = "eng+hin+nep+nld+spa+chi_sim";
   initPromise = createWorker(languages, 1, {
     langPath: "https://tessdata.projectnaptha.com/4.0.0",
@@ -136,7 +134,10 @@ function findDateNearKeyword(
       // Look for dates after the keyword first
       for (const date of dates) {
         const dateIndex = text.indexOf(date);
-        if (dateIndex > keywordIndex && dateIndex - keywordIndex < maxDistance) {
+        if (
+          dateIndex > keywordIndex &&
+          dateIndex - keywordIndex < maxDistance
+        ) {
           return date;
         }
       }
@@ -419,16 +420,24 @@ function normalizeDate(dateStr: string): string | null {
     const dotSeparated = normalizedStr.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
     if (dotSeparated) {
       const [, day, month, year] = dotSeparated;
-      normalizedStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      normalizedStr = `${year}-${month.padStart(2, "0")}-${day.padStart(
+        2,
+        "0"
+      )}`;
     }
 
     // Handle DD/MM/YYYY format
-    const slashSeparated = normalizedStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    const slashSeparated = normalizedStr.match(
+      /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/
+    );
     if (slashSeparated) {
       const [, day, month, year] = slashSeparated;
       // Assume DD/MM/YYYY if day > 12, otherwise ambiguous but assume DD/MM
       if (parseInt(day) > 12 || parseInt(month) <= 12) {
-        normalizedStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        normalizedStr = `${year}-${month.padStart(2, "0")}-${day.padStart(
+          2,
+          "0"
+        )}`;
       }
     }
 
@@ -448,19 +457,22 @@ function normalizeDate(dateStr: string): string | null {
     }
 
     const isoDate = date.toISOString().split("T")[0];
-    
+
     // Validate the final format is YYYY-MM-DD
     if (!/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) {
       return null;
     }
-    
+
     return isoDate;
   } catch {
     return null;
   }
 }
 
-export function extractDocumentData(text: string, confidence: number = 0): ExtractedDocumentData {
+export function extractDocumentData(
+  text: string,
+  confidence: number = 0
+): ExtractedDocumentData {
   if (!text) {
     return {
       title: null,
@@ -486,7 +498,9 @@ export function extractDocumentData(text: string, confidence: number = 0): Extra
   // Generate low confidence warning if needed
   let lowConfidenceWarning: string | undefined;
   if (confidence < 70 && confidence > 0) {
-    lowConfidenceWarning = `OCR confidence is low (${confidence.toFixed(0)}%). Please verify extracted fields.`;
+    lowConfidenceWarning = `OCR confidence is low (${confidence.toFixed(
+      0
+    )}%). Please verify extracted fields.`;
   }
 
   return {
@@ -502,7 +516,6 @@ export function extractDocumentData(text: string, confidence: number = 0): Extra
   };
 }
 
-// Helper to call the AI processing API
 async function processWithAI(
   text: string
 ): Promise<Partial<ExtractedDocumentData>> {
@@ -518,32 +531,38 @@ async function processWithAI(
     }
 
     const data = await response.json();
-    
-    // Helper to filter out "null" strings that AI sometimes returns
+
     const cleanValue = (val: any): string | null => {
       if (val === null || val === undefined) return null;
       const str = String(val).trim();
-      if (str === "" || str.toLowerCase() === "null" || str.toLowerCase() === "undefined") {
+      if (
+        str === "" ||
+        str.toLowerCase() === "null" ||
+        str.toLowerCase() === "undefined"
+      ) {
         return null;
       }
       return str;
     };
-    
+
     // Extract name from metadata or top-level if provided
-    const extractedName = cleanValue(data.name) || 
-      cleanValue(data.metadata?.name) || 
-      cleanValue(data.metadata?.full_name) || 
+    const extractedName =
+      cleanValue(data.name) ||
+      cleanValue(data.metadata?.name) ||
+      cleanValue(data.metadata?.full_name) ||
       null;
-    
+
     // Validate and normalize dates from AI
-    const validateDate = (dateStr: string | null | undefined): string | null => {
+    const validateDate = (
+      dateStr: string | null | undefined
+    ): string | null => {
       if (!dateStr) return null;
       const cleaned = cleanValue(dateStr);
       if (!cleaned) return null;
       // Use the normalizeDate function to validate the date format
       return normalizeDate(cleaned);
     };
-    
+
     // Clean the metadata object to remove null strings
     const cleanedMetadata: Record<string, any> = {};
     if (data.metadata) {
@@ -554,7 +573,7 @@ async function processWithAI(
         }
       }
     }
-    
+
     return {
       title: cleanValue(data.title),
       type: cleanValue(data.type) || "Other",
@@ -573,19 +592,14 @@ export async function processDocument(
   file: File,
   onProgress?: (progress: number) => void
 ): Promise<ExtractedDocumentData> {
-  // 1. Perform OCR (Client-side)
   const ocrResult = await performOCR(file, onProgress);
   const text = ocrResult.text || "";
   const confidence = ocrResult.confidence || 0;
 
-  // 2. Extract regex-based data (Legacy/Fallback) with confidence
   const legacyData = extractDocumentData(text, confidence);
 
-  // 3. Process with AI (Server-side)
-  // We notify progress as 100% done with OCR, now "Analyzing..."
   const aiData = await processWithAI(text);
 
-  // 4. Merge results (AI takes precedence for most fields)
   return {
     ...legacyData,
     ...aiData,
@@ -624,7 +638,9 @@ export async function processMultipleDocuments(
   // Process back side
   if (files.back) {
     const ocrResult = await performOCR(files.back, (p) => {
-      onProgress?.(((processedFiles / totalFiles) + (p / 100) * (1 / totalFiles)) * 100);
+      onProgress?.(
+        (processedFiles / totalFiles + (p / 100) * (1 / totalFiles)) * 100
+      );
     });
     results.push({
       text: `\n--- BACK SIDE ---\n${ocrResult.text}`,
@@ -632,18 +648,14 @@ export async function processMultipleDocuments(
     });
   }
 
-  // Combine text from both sides
   const combinedText = results.map((r) => r.text).join("\n");
   const avgConfidence =
     results.reduce((sum, r) => sum + r.confidence, 0) / results.length;
 
-  // 2. Extract regex-based data with combined text
   const legacyData = extractDocumentData(combinedText, avgConfidence);
 
-  // 3. Process with AI
   const aiData = await processWithAI(combinedText);
 
-  // 4. Merge results
   return {
     ...legacyData,
     ...aiData,
